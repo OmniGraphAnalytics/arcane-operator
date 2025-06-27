@@ -1,4 +1,3 @@
-using System;
 using System.Diagnostics.CodeAnalysis;
 using Arcane.Operator.Configurations;
 using Arcane.Operator.Models.Base;
@@ -23,22 +22,15 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Snd.Sdk.ActorProviders;
-using Snd.Sdk.Kubernetes.Providers;
-using Snd.Sdk.Metrics.Configurations;
-using Snd.Sdk.Metrics.Providers;
+using OmniModels.Configurations;
+using OmniModels.Extensions;
 
 namespace Arcane.Operator;
 
 [ExcludeFromCodeCoverage]
-public class Startup
+public class Startup(IConfiguration configuration)
 {
-    public Startup(IConfiguration configuration)
-    {
-        this.Configuration = configuration;
-    }
-
-    public IConfiguration Configuration { get; }
+    public IConfiguration Configuration { get; } = configuration;
 
     public void ConfigureServices(IServiceCollection services)
     {
@@ -88,7 +80,7 @@ public class Startup
         services.AddControllers();
     }
 
-    public void Configure(IApplicationBuilder app, IWebHostEnvironment env,
+    public static void Configure(IApplicationBuilder app, IWebHostEnvironment env,
         IHostApplicationLifetime hostApplicationLifetime)
     {
         app.UseRouting();

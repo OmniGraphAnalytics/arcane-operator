@@ -39,9 +39,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Snd.Sdk.Kubernetes;
-using Snd.Sdk.Kubernetes.Base;
-using Snd.Sdk.Metrics.Base;
+using OmniModels.Services.Base;
 using Xunit;
 using static Arcane.Operator.Tests.Services.TestCases.JobTestCases;
 using static Arcane.Operator.Tests.Services.TestCases.StreamDefinitionTestCases;
@@ -82,14 +80,14 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
 
     public static IEnumerable<object[]> GenerateSynchronizationTestCases()
     {
-        yield return new object[] { WatchEventType.Added, StreamDefinitionTestCases.StreamDefinition, true, false, false, false };
-        yield return new object[] { WatchEventType.Modified, StreamDefinitionTestCases.StreamDefinition, false, true, true, false };
-        yield return new object[] { WatchEventType.Modified, StreamDefinitionTestCases.StreamDefinition, false, true, false, false };
+        yield return [WatchEventType.Added, StreamDefinitionTestCases.StreamDefinition, true, false, false, false];
+        yield return [WatchEventType.Modified, StreamDefinitionTestCases.StreamDefinition, false, true, true, false];
+        yield return [WatchEventType.Modified, StreamDefinitionTestCases.StreamDefinition, false, true, false, false];
 
-        yield return new object[] { WatchEventType.Added, SuspendedStreamDefinition, false, false, false, false };
-        yield return new object[] { WatchEventType.Deleted, SuspendedStreamDefinition, false, false, false, false };
-        yield return new object[] { WatchEventType.Modified, SuspendedStreamDefinition, false, false, true, true };
-        yield return new object[] { WatchEventType.Modified, SuspendedStreamDefinition, false, false, false, false };
+        yield return [WatchEventType.Added, SuspendedStreamDefinition, false, false, false, false];
+        yield return [WatchEventType.Deleted, SuspendedStreamDefinition, false, false, false, false];
+        yield return [WatchEventType.Modified, SuspendedStreamDefinition, false, false, true, true];
+        yield return [WatchEventType.Modified, SuspendedStreamDefinition, false, false, false, false];
     }
 
     [Theory]
@@ -165,8 +163,8 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
 
     public static IEnumerable<object[]> GenerateModifiedTestCases()
     {
-        yield return new object[] { StreamDefinitionTestCases.StreamDefinition, true, true };
-        yield return new object[] { StreamDefinitionTestCases.StreamDefinition, false, false };
+        yield return [StreamDefinitionTestCases.StreamDefinition, true, true];
+        yield return [StreamDefinitionTestCases.StreamDefinition, false, false];
     }
 
     [Theory]
@@ -205,8 +203,8 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
 
     public static IEnumerable<object[]> GenerateReloadTestCases()
     {
-        yield return new object[] { ReloadRequestedStreamDefinition, true, true };
-        yield return new object[] { ReloadRequestedStreamDefinition, false, false };
+        yield return [ReloadRequestedStreamDefinition, true, true];
+        yield return [ReloadRequestedStreamDefinition, false, false];
     }
 
     [Theory]
@@ -251,17 +249,17 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
 
     public static IEnumerable<object[]> GenerateAddTestCases()
     {
-        yield return new object[] { ReloadRequestedStreamDefinition, true, true, false };
-        yield return new object[] { ReloadRequestedStreamDefinition, false, false, true };
-        yield return new object[] { ReloadRequestedStreamDefinition, true, false, false };
+        yield return [ReloadRequestedStreamDefinition, true, true, false];
+        yield return [ReloadRequestedStreamDefinition, false, false, true];
+        yield return [ReloadRequestedStreamDefinition, true, false, false];
 
-        yield return new object[] { StreamDefinitionTestCases.StreamDefinition, true, true, false };
-        yield return new object[] { StreamDefinitionTestCases.StreamDefinition, false, false, true };
-        yield return new object[] { StreamDefinitionTestCases.StreamDefinition, true, false, false };
+        yield return [StreamDefinitionTestCases.StreamDefinition, true, true, false];
+        yield return [StreamDefinitionTestCases.StreamDefinition, false, false, true];
+        yield return [StreamDefinitionTestCases.StreamDefinition, true, false, false];
 
-        yield return new object[] { SuspendedStreamDefinition, true, true, false };
-        yield return new object[] { SuspendedStreamDefinition, false, false, false };
-        yield return new object[] { SuspendedStreamDefinition, true, false, false };
+        yield return [SuspendedStreamDefinition, true, true, false];
+        yield return [SuspendedStreamDefinition, false, false, false];
+        yield return [SuspendedStreamDefinition, true, false, false];
     }
 
     [Theory]
@@ -300,7 +298,7 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
 
     public static IEnumerable<object[]> GenerateRecoverableTestCases()
     {
-        yield return new object[] { FailedStreamDefinition(new JsonException()) };
+        yield return [FailedStreamDefinition(new JsonException())];
     }
 
     [Theory]
@@ -330,7 +328,7 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
 
     public static IEnumerable<object[]> GenerateFatalTestCases()
     {
-        yield return new object[] { FailedStreamDefinition(new BufferOverflowException("test")) };
+        yield return [FailedStreamDefinition(new BufferOverflowException("test"))];
     }
 
     [Theory]

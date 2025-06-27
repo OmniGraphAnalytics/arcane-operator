@@ -11,15 +11,15 @@ public class CustomResourceConfiguration
     /// <summary>
     /// Api group of the StreamDefinition CRD
     /// </summary>
-    public string ApiGroup { get; init; }
+    public string? ApiGroup { get; init; }
 
     /// <summary>
     /// Version of the CRD
     /// </summary>
-    public string Version { get; init; }
+    public string? Version { get; init; }
 
     /// <summary>
     /// Plural of the CRD
     /// </summary>
-    public string Plural { get; init; }
+    public string? Plural { get; init; }
 }

@@ -1,8 +1,7 @@
-﻿using System;
-using Akka.Streams;
+﻿using Akka.Streams;
 using k8s;
 using k8s.Models;
-using Snd.Sdk.Kubernetes;
+using OmniModels.Models.OmniPulse.Kubernetes;
 
 namespace Arcane.Operator.Models.Resources.StreamClass.Base;
 

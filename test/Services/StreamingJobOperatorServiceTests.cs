@@ -33,8 +33,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Snd.Sdk.Kubernetes.Base;
-using Snd.Sdk.Metrics.Base;
+using OmniModels.Services.Base;
 using Xunit;
 using static Arcane.Operator.Tests.Services.TestCases.JobTestCases;
 using static Arcane.Operator.Tests.Services.TestCases.StreamDefinitionTestCases;
@@ -161,41 +160,41 @@ public class StreamingJobOperatorServiceTests : IClassFixture<LoggerFixture>
 
     public static IEnumerable<object[]> GenerateDeletedJobTestCases()
     {
-        yield return new object[] { CompletedJob, StreamDefinition, true, false };
-        yield return new object[] { ReloadRequestedJob, StreamDefinition, true, true };
-        yield return new object[] { SchemaMismatchJob, StreamDefinition, true, true };
+        yield return [CompletedJob, StreamDefinition, true, false];
+        yield return [ReloadRequestedJob, StreamDefinition, true, true];
+        yield return [SchemaMismatchJob, StreamDefinition, true, true];
 
-        yield return new object[] { CompletedJob, SuspendedStreamDefinition, false, false };
-        yield return new object[] { ReloadRequestedJob, SuspendedStreamDefinition, false, true };
-        yield return new object[] { SchemaMismatchJob, SuspendedStreamDefinition, false, true };
+        yield return [CompletedJob, SuspendedStreamDefinition, false, false];
+        yield return [ReloadRequestedJob, SuspendedStreamDefinition, false, true];
+        yield return [SchemaMismatchJob, SuspendedStreamDefinition, false, true];
     }
 
     public static IEnumerable<object[]> GenerateCompletedJobTestCases()
     {
-        yield return new object[] { FailedJob, true, false, false };
-        yield return new object[] { FailedJob, false, false, false };
+        yield return [FailedJob, true, false, false];
+        yield return [FailedJob, false, false, false];
 
-        yield return new object[] { CompletedJob, true, false, true };
-        yield return new object[] { CompletedJob, false, false, true };
+        yield return [CompletedJob, true, false, true];
+        yield return [CompletedJob, false, false, true];
 
-        yield return new object[] { RunningJob, true, false, true };
-        yield return new object[] { RunningJob, false, false, true };
+        yield return [RunningJob, true, false, true];
+        yield return [RunningJob, false, false, true];
 
-        yield return new object[] { SchemaMismatchJob, true, true, true };
-        yield return new object[] { SchemaMismatchJob, false, true, true };
+        yield return [SchemaMismatchJob, true, true, true];
+        yield return [SchemaMismatchJob, false, true, true];
 
-        yield return new object[] { ReloadRequestedJob, true, true, true };
-        yield return new object[] { ReloadRequestedJob, false, true, true };
+        yield return [ReloadRequestedJob, true, true, true];
+        yield return [ReloadRequestedJob, false, true, true];
     }
 
     public static IEnumerable<object[]> GenerateModifiedJobCases()
     {
-        yield return new object[] { TerminatingJob, false };
-        yield return new object[] { ReloadRequestedJob, true };
-        yield return new object[] { CompletedJob, false };
-        yield return new object[] { FailedJob, false };
-        yield return new object[] { RunningJob, false };
-        yield return new object[] { SchemaMismatchJob, false };
+        yield return [TerminatingJob, false];
+        yield return [ReloadRequestedJob, true];
+        yield return [CompletedJob, false];
+        yield return [FailedJob, false];
+        yield return [RunningJob, false];
+        yield return [SchemaMismatchJob, false];
     }
 
 

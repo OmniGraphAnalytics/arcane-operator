@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Akka;
+﻿using Akka;
 using Akka.Streams;
 using Akka.Streams.Dsl;
 using Akka.Streams.Supervision;
@@ -22,50 +18,27 @@ using Arcane.Operator.Services.Base.Repositories.StreamingJob;
 using k8s;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
-using Snd.Sdk.ActorProviders;
-using Snd.Sdk.Tasks;
+using OmniModels.Extensions;
 
 namespace Arcane.Operator.Services.Operators;
 
-public sealed class StreamOperatorService : IStreamOperatorService, IDisposable
+public sealed class StreamOperatorService(
+    IMetricsReporter metricsReporter,
+    ICommandHandler<UpdateStatusCommand> updateStatusCommandHandler,
+    ICommandHandler<SetAnnotationCommand<V1Job>> setAnnotationCommandHandler,
+    ICommandHandler<StreamingJobCommand> streamingJobCommandHandler,
+    ILogger<StreamOperatorService> logger,
+    IMaterializer materializer,
+    IReactiveResourceCollection<IStreamDefinition> streamDefinitionSource,
+    IEventFilter<IStreamDefinition> eventFilter,
+    IStreamingJobCollection streamingJobCollection)
+    : IStreamOperatorService, IDisposable
 {
     private const int PARALLELISM = 1;
     private const int BUFFER_SIZE = 1000;
 
-    private readonly ILogger<StreamOperatorService> logger;
-    private readonly IMetricsReporter metricsReporter;
-    private readonly ICommandHandler<UpdateStatusCommand> updateStatusCommandHandler;
-    private readonly ICommandHandler<SetAnnotationCommand<V1Job>> setAnnotationCommandHandler;
-    private readonly ICommandHandler<StreamingJobCommand> streamingJobCommandHandler;
-    private readonly IMaterializer materializer;
-    private readonly CancellationTokenSource cancellationTokenSource;
-    private readonly IStreamingJobCollection streamingJobCollection;
+    private readonly CancellationTokenSource cancellationTokenSource = new();
     private readonly Dictionary<string, UniqueKillSwitch> killSwitches = new();
-    private readonly IReactiveResourceCollection<IStreamDefinition> streamDefinitionSource;
-    private readonly IEventFilter<IStreamDefinition> eventFilter;
-
-    public StreamOperatorService(
-        IMetricsReporter metricsReporter,
-        ICommandHandler<UpdateStatusCommand> updateStatusCommandHandler,
-        ICommandHandler<SetAnnotationCommand<V1Job>> setAnnotationCommandHandler,
-        ICommandHandler<StreamingJobCommand> streamingJobCommandHandler,
-        ILogger<StreamOperatorService> logger,
-        IMaterializer materializer,
-        IReactiveResourceCollection<IStreamDefinition> streamDefinitionSource,
-        IEventFilter<IStreamDefinition> eventFilter,
-        IStreamingJobCollection streamingJobCollection)
-    {
-        this.logger = logger;
-        this.metricsReporter = metricsReporter;
-        this.updateStatusCommandHandler = updateStatusCommandHandler;
-        this.streamingJobCommandHandler = streamingJobCommandHandler;
-        this.setAnnotationCommandHandler = setAnnotationCommandHandler;
-        this.materializer = materializer;
-        this.cancellationTokenSource = new CancellationTokenSource();
-        this.streamDefinitionSource = streamDefinitionSource;
-        this.streamingJobCollection = streamingJobCollection;
-        this.eventFilter = eventFilter;
-    }
 
     public void Dispose()
     {
@@ -88,17 +61,17 @@ public sealed class StreamOperatorService : IStreamOperatorService, IDisposable
 
 
         var restartSource = RestartSource
-            .WithBackoff(() => this.streamDefinitionSource.GetEvents(request, streamClass.MaxBufferCapacity), streamClass.RestartSettings)
+            .WithBackoff(() => streamDefinitionSource.GetEvents(request, streamClass.MaxBufferCapacity), streamClass.RestartSettings)
             .ViaMaterialized(KillSwitches.Single<ResourceEvent<IStreamDefinition>>(), Keep.Right);
 
         var ks = restartSource
             .Recover(cause =>
             {
-                this.logger.LogError(cause, "Stream class {streamClassId} has been stopped due to an exception", streamClass.ToStreamClassId());
+                logger.LogError(cause, "Stream class {streamClassId} has been stopped due to an exception", streamClass.ToStreamClassId());
                 this.Detach(streamClass);
                 throw cause;
             })
-            .ToMaterialized(this.Sink.Value, Keep.Left).Run(this.materializer);
+            .ToMaterialized(this.Sink.Value, Keep.Left).Run(materializer);
         this.killSwitches[streamClass.ToStreamClassId()] = ks;
     }
 
@@ -109,21 +82,21 @@ public sealed class StreamOperatorService : IStreamOperatorService, IDisposable
             ks.Shutdown();
             this.killSwitches.Remove(streamClass.ToStreamClassId());
         }
-        this.logger.LogInformation("THe stream class with id {streamClassId} has been detached", streamClass.ToStreamClassId());
+        logger.LogInformation("THe stream class with id {streamClassId} has been detached", streamClass.ToStreamClassId());
     }
 
     private Lazy<Sink<ResourceEvent<IStreamDefinition>, NotUsed>> Sink =>
-        new(() => this.BuildSink(this.cancellationTokenSource.Token).Run(this.materializer));
+        new(() => this.BuildSink(this.cancellationTokenSource.Token).Run(materializer));
 
     private IRunnableGraph<Sink<ResourceEvent<IStreamDefinition>, NotUsed>> BuildSink(CancellationToken cancellationToken)
     {
         return MergeHub.Source<ResourceEvent<IStreamDefinition>>(perProducerBufferSize: BUFFER_SIZE)
-            .Via(this.eventFilter.Filter())
+            .Via(eventFilter.Filter())
             .CollectOption()
             .Via(cancellationToken.AsFlow<ResourceEvent<IStreamDefinition>>(true))
-            .Select(this.metricsReporter.ReportTrafficMetrics)
+            .Select(metricsReporter.ReportTrafficMetrics)
             .SelectAsync(PARALLELISM,
-                ev => this.streamingJobCollection.Get(ev.kubernetesObject.Namespace(),
+                ev => streamingJobCollection.Get(ev.kubernetesObject.Namespace(),
                         ev.kubernetesObject.StreamId)
                     .Map(job => (ev, job)))
             .Select(this.OnEvent)
@@ -134,7 +107,7 @@ public sealed class StreamOperatorService : IStreamOperatorService, IDisposable
 
     private Decider LogAndResumeDecider => cause =>
     {
-        this.logger.LogWarning(cause, "Queue element dropped due to exception in processing code");
+        logger.LogWarning(cause, "Queue element dropped due to exception in processing code");
         return Directive.Resume;
     };
 
@@ -150,7 +123,7 @@ public sealed class StreamOperatorService : IStreamOperatorService, IDisposable
 
     private KubernetesCommand OnAdded(IStreamDefinition streamDefinition, Option<V1Job> maybeJob)
     {
-        this.logger.LogInformation("Added a stream definition with id {streamId}", streamDefinition.StreamId);
+        logger.LogInformation("Added a stream definition with id {streamId}", streamDefinition.StreamId);
         return maybeJob switch
         {
             { HasValue: true, Value: var job } when job.IsReloading() => new Reloading(streamDefinition),
@@ -164,7 +137,7 @@ public sealed class StreamOperatorService : IStreamOperatorService, IDisposable
 
     private List<KubernetesCommand> OnModified(IStreamDefinition streamDefinition, Option<V1Job> maybeJob)
     {
-        this.logger.LogInformation("Modified a stream definition with id {streamId}", streamDefinition.StreamId);
+        logger.LogInformation("Modified a stream definition with id {streamId}", streamDefinition.StreamId);
         return maybeJob switch
         {
             { HasValue: false } when streamDefinition.CrashLoopDetected => new SetCrashLoopStatusCommand(streamDefinition).AsList(),
@@ -203,11 +176,11 @@ public sealed class StreamOperatorService : IStreamOperatorService, IDisposable
 
     private Task HandleCommand(KubernetesCommand response) => response switch
     {
-        UpdateStatusCommand sdc => this.updateStatusCommandHandler.Handle(sdc),
-        StreamingJobCommand sjc => this.streamingJobCommandHandler.Handle(sjc),
-        RequestJobRestartCommand rrc => this.setAnnotationCommandHandler.Handle(rrc),
-        RequestJobReloadCommand rrc => this.setAnnotationCommandHandler.Handle(rrc),
-        SetAnnotationCommand<V1Job> sac => this.setAnnotationCommandHandler.Handle(sac),
+        UpdateStatusCommand sdc => updateStatusCommandHandler.Handle(sdc),
+        StreamingJobCommand sjc => streamingJobCommandHandler.Handle(sjc),
+        RequestJobRestartCommand rrc => setAnnotationCommandHandler.Handle(rrc),
+        RequestJobReloadCommand rrc => setAnnotationCommandHandler.Handle(rrc),
+        SetAnnotationCommand<V1Job> sac => setAnnotationCommandHandler.Handle(sac),
         _ => throw new ArgumentOutOfRangeException(nameof(response), response, null)
     };
 }

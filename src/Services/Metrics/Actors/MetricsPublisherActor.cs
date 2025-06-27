@@ -1,8 +1,7 @@
-﻿using System.Collections.Generic;
-using Akka.Actor;
+﻿using Akka.Actor;
 using Akka.Event;
 using Arcane.Operator.Configurations;
-using Snd.Sdk.Metrics.Base;
+using OmniModels.Services.Base;
 
 namespace Arcane.Operator.Services.Metrics.Actors;
 
@@ -18,7 +17,7 @@ public record AddStreamClassMetricsMessage(string StreamKindRef, string MetricNa
 
 
 /// <summary>
-/// Remove stream class metrics message. Once received, the metrics will be removed from the 
+/// Remove stream class metrics message. Once received, the metrics will be removed from the
 /// metrics collection in the <see cref="StreamKindRef"/> actor.
 /// </summary>
 /// <param name="StreamKindRef">Name of the stream kind referenced by the stream class</param>
@@ -39,13 +38,13 @@ public class StreamClassMetric
     /// <summary>
     /// Name of the metric to report.
     /// </summary>
-    public string MetricName { get; init; }
+    public string? MetricName { get; init; }
 
 
     /// <summary>
     /// Tags of the metric to report.
     /// </summary>
-    public SortedDictionary<string, string> MetricTags { get; init; }
+    public SortedDictionary<string, string> MetricTags { get; init; } = new();
 
     /// <summary>
     /// Metric Value
@@ -60,9 +59,9 @@ public class StreamClassMetric
 /// </summary>
 public class MetricsPublisherActor : ReceiveActor, IWithTimers
 {
-    public ITimerScheduler Timers { get; set; }
+    public ITimerScheduler Timers { get; set; } = null!;
     private readonly Dictionary<string, StreamClassMetric> streamClassMetrics = new();
-    private readonly ILoggingAdapter Log = Context.GetLogger();
+    private readonly ILoggingAdapter log = Context.GetLogger();
     private readonly MetricsPublisherActorConfiguration configuration;
 
     public MetricsPublisherActor(MetricsPublisherActorConfiguration configuration, MetricsService metricsService)
@@ -70,7 +69,7 @@ public class MetricsPublisherActor : ReceiveActor, IWithTimers
         this.configuration = configuration;
         this.Receive<AddStreamClassMetricsMessage>(s =>
         {
-            this.Log.Debug("Adding stream class metrics for {streamKindRef}", s.StreamKindRef);
+            this.log.Debug("Adding stream class metrics for {streamKindRef}", s.StreamKindRef);
             this.streamClassMetrics[s.StreamKindRef] = new StreamClassMetric
             {
                 MetricTags = s.MetricTags,
@@ -82,13 +81,13 @@ public class MetricsPublisherActor : ReceiveActor, IWithTimers
         {
             if (!this.streamClassMetrics.Remove(s.StreamKindRef))
             {
-                this.Log.Warning("Stream class {streamKindRef} not found in metrics collection", s.StreamKindRef);
+                this.log.Warning("Stream class {streamKindRef} not found in metrics collection", s.StreamKindRef);
             }
         });
 
         this.Receive<EmitMetricsMessage>(_ =>
         {
-            this.Log.Debug("Start emitting stream class metrics");
+            this.log.Debug("Start emitting stream class metrics");
             foreach (var (_, metric) in this.streamClassMetrics)
             {
                 metricsService.Count(metric.MetricName, metric.MetricValue, metric.MetricTags);

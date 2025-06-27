@@ -20,7 +20,7 @@ using k8s.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Snd.Sdk.Kubernetes.Base;
+using OmniModels.Services.Base;
 using Xunit;
 using static Arcane.Operator.Tests.Services.TestCases.StreamDefinitionTestCases;
 using static Arcane.Operator.Tests.Services.TestCases.StreamClassTestCases;
@@ -69,7 +69,7 @@ public class StreamingJobCommandHandlerTests(LoggerFixture loggerFixture) : ICla
         this.streamingJobTemplateRepositoryMock
             .Setup(sjtr => sjtr.GetStreamingJobTemplate(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(((IStreamingJobTemplate)StreamingJobTemplate).AsOption());
-        var expectedState = isBackfilling ? StreamPhase.RELOADING.ToString() : StreamPhase.RUNNING.ToString();
+        var expectedState = isBackfilling ? nameof(StreamPhase.RELOADING) : nameof(StreamPhase.RUNNING);
 
         // Act
         await service.Handle(command);
@@ -147,7 +147,7 @@ public class StreamingJobCommandHandlerTests(LoggerFixture loggerFixture) : ICla
                 It.IsAny<string>(),
                 StreamDefinition.Namespace(),
                 StreamDefinition.Name(),
-                It.Is<V1Alpha1StreamStatus>(s => s.Phase == StreamPhase.FAILED.ToString()),
+                It.Is<V1Alpha1StreamStatus>(s => s.Phase == nameof(StreamPhase.FAILED)),
                 It.IsAny<Func<JsonElement, It.IsAnyType>>()),
             Times.Once);
     }
@@ -182,7 +182,7 @@ public class StreamingJobCommandHandlerTests(LoggerFixture loggerFixture) : ICla
                 It.IsAny<string>(),
                 StreamDefinition.Namespace(),
                 StreamDefinition.Name(),
-                It.Is<V1Alpha1StreamStatus>(s => s.Phase == StreamPhase.FAILED.ToString()),
+                It.Is<V1Alpha1StreamStatus>(s => s.Phase == nameof(StreamPhase.FAILED)),
                 It.IsAny<Func<JsonElement, It.IsAnyType>>()),
             Times.Once);
     }

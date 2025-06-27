@@ -1,13 +1,11 @@
-using System;
 using System.Diagnostics.CodeAnalysis;
 using Arcane.Operator.Extensions;
 using Arcane.Operator.Services.HostedServices;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OmniModels.Extensions;
 using Serilog;
-using Snd.Sdk.Logs.Providers;
-using Snd.Sdk.Logs.Providers.Configurations;
 
 namespace Arcane.Operator;
 
@@ -16,7 +14,7 @@ public class Program
 {
     public static int Main(string[] args)
     {
-        Log.Logger = DefaultLoggingProvider.CreateBootstrapLogger(AppDomain.CurrentDomain.FriendlyName);
+        Log.Logger = DatadogLoggingProvider.CreateBootstrapLogger(AppDomain.CurrentDomain.FriendlyName);
         try
         {
             Log.Information("Starting web host");

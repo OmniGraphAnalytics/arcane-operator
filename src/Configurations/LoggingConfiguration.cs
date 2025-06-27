@@ -13,7 +13,7 @@ public class LoggingConfiguration
     /// <summary>
     /// Custom static properties to enrich the logger with.
     /// </summary>
-    public Dictionary<string, string> CustomProperties { get; init; }
+    public Dictionary<string, string> CustomProperties { get; init; } = new();
 
     /// <summary>
     /// Minimum level overrides for specific loggers.
@@ -24,5 +24,12 @@ public class LoggingConfiguration
     /// }
     /// </example>
     /// </summary>
-    public Dictionary<string, string> MinimumLevelOverrides { get; init; }
+    public Dictionary<string, string> MinimumLevelOverrides { get; init; } = new()
+    {
+        { "Microsoft", "Warning" },
+        { "System", "Warning" },
+        { "Microsoft.Hosting.Lifetime", "Information" },
+        { "Microsoft.AspNetCore", "Warning" },
+        { "Akka", "Warning" },
+    };
 };

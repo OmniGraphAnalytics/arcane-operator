@@ -12,10 +12,10 @@ public class StreamingJobOperatorServiceConfiguration
     /// <summary>
     /// Max buffer capacity for job events stream
     /// </summary>
-    public int MaxBufferCapacity { get; init; }
+    public int MaxBufferCapacity { get; init; } = 100;
 
     /// <summary>
     /// Namespace where the job will be created
     /// </summary>
-    public string Namespace { get; set; }
+    public string Namespace { get; set; } = "arcane";
 }

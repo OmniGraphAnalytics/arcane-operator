@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
-using Akka.Streams;
+﻿using Akka.Streams;
 using Akka.Streams.Dsl;
 using Akka.Streams.Supervision;
 using Akka.Util;
@@ -17,7 +14,7 @@ using k8s;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Snd.Sdk.ActorProviders;
+using OmniModels.Extensions;
 
 namespace Arcane.Operator.Services.Operators;
 

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 using Arcane.Operator.Models.Resources.StreamClass.Base;
 using k8s;
 using k8s.Models;
-using Snd.Sdk.Kubernetes;
+using OmniModels.Models.OmniPulse.Kubernetes;
 
 namespace Arcane.Operator.Models.Resources.StreamClass.V1Beta1;
 

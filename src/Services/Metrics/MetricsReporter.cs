@@ -8,7 +8,7 @@ using Arcane.Operator.Services.Metrics.Actors;
 using k8s;
 using k8s.Models;
 using Microsoft.Extensions.Options;
-using Snd.Sdk.Metrics.Base;
+using OmniModels.Services.Base;
 
 namespace Arcane.Operator.Services.Metrics;
 
@@ -24,7 +24,7 @@ public class MetricsReporter : IMetricsReporter
         IOptions<MetricsReporterConfiguration> metricsReporterConfiguration)
     {
         this.metricsService = metricsService;
-        this.statusActor = actorSystem.ActorOf(Props.Create(() => new MetricsPublisherActor(
+        this.statusActor = actorSystem.ActorOf(props: Props.Create(() => new MetricsPublisherActor(
                 metricsReporterConfiguration.Value.MetricsPublisherActorConfiguration,
                 metricsService)),
             nameof(MetricsPublisherActor));

@@ -1,7 +1,7 @@
 ﻿using System;
 using Arcane.Operator.Models.Resources.StreamClass.Base;
 using k8s.Models;
-using Snd.Sdk.Kubernetes;
+using OmniModels.Models.OmniPulse.Kubernetes;
 
 namespace Arcane.Operator.Tests.Services.TestCases;
 

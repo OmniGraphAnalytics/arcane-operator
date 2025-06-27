@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Akka.Streams;
 using Akka.Streams.Dsl;
 using Akka.Util;
@@ -20,53 +16,32 @@ using k8s;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Snd.Sdk.ActorProviders;
-using Snd.Sdk.Kubernetes;
-using Snd.Sdk.Tasks;
+using OmniModels.Extensions;
+using OmniModels.Services.Kubernetes;
 
 namespace Arcane.Operator.Services.Operators;
 
-public class StreamingJobOperatorService : IStreamingJobOperatorService
+public class StreamingJobOperatorService(
+    ILogger<StreamingJobOperatorService> logger,
+    IOptions<StreamingJobOperatorServiceConfiguration> options,
+    IMetricsReporter metricsReporter,
+    IResourceCollection<IStreamDefinition> streamDefinitionCollection,
+    ICommandHandler<UpdateStatusCommand> updateStatusCommandHandler,
+    ICommandHandler<SetAnnotationCommand<IStreamDefinition>> setAnnotationCommandHandler,
+    ICommandHandler<StreamingJobCommand> streamingJobCommandHandler,
+    ICommandHandler<RemoveAnnotationCommand<IStreamDefinition>> removeAnnotationHandler,
+    IStreamingJobCollection streamingJobCollection)
+    : IStreamingJobOperatorService
 {
     private const int parallelism = 1;
-    private readonly StreamingJobOperatorServiceConfiguration configuration;
-    private readonly ILogger<StreamingJobOperatorService> logger;
-    private readonly IResourceCollection<IStreamDefinition> streamDefinitionCollection;
-    private readonly IMetricsReporter metricsReporter;
-    private readonly ICommandHandler<UpdateStatusCommand> updateStatusCommandHandler;
-    private readonly ICommandHandler<SetAnnotationCommand<IStreamDefinition>> setAnnotationCommandHandler;
-    private readonly ICommandHandler<StreamingJobCommand> streamingJobCommandHandler;
-    private readonly ICommandHandler<RemoveAnnotationCommand<IStreamDefinition>> removeAnnotationHandler;
-    private readonly IStreamingJobCollection streamingJobCollection;
-
-    public StreamingJobOperatorService(
-        ILogger<StreamingJobOperatorService> logger,
-        IOptions<StreamingJobOperatorServiceConfiguration> options,
-        IMetricsReporter metricsReporter,
-        IResourceCollection<IStreamDefinition> streamDefinitionCollection,
-        ICommandHandler<UpdateStatusCommand> updateStatusCommandHandler,
-        ICommandHandler<SetAnnotationCommand<IStreamDefinition>> setAnnotationCommandHandler,
-        ICommandHandler<StreamingJobCommand> streamingJobCommandHandler,
-        ICommandHandler<RemoveAnnotationCommand<IStreamDefinition>> removeAnnotationHandler,
-        IStreamingJobCollection streamingJobCollection)
-    {
-        this.configuration = options.Value;
-        this.streamDefinitionCollection = streamDefinitionCollection;
-        this.logger = logger;
-        this.metricsReporter = metricsReporter;
-        this.updateStatusCommandHandler = updateStatusCommandHandler;
-        this.streamingJobCommandHandler = streamingJobCommandHandler;
-        this.setAnnotationCommandHandler = setAnnotationCommandHandler;
-        this.streamingJobCollection = streamingJobCollection;
-        this.removeAnnotationHandler = removeAnnotationHandler;
-    }
+    private readonly StreamingJobOperatorServiceConfiguration configuration = options.Value;
 
 
     public IRunnableGraph<Task> GetJobEventsGraph(CancellationToken cancellationToken)
     {
-        return this.streamingJobCollection.GetEvents(this.configuration.Namespace, this.configuration.MaxBufferCapacity)
+        return streamingJobCollection.GetEvents(this.configuration.Namespace, this.configuration.MaxBufferCapacity)
             .Via(cancellationToken.AsFlow<ResourceEvent<V1Job>>(true))
-            .Select(this.metricsReporter.ReportTrafficMetrics)
+            .Select(metricsReporter.ReportTrafficMetrics)
             .SelectAsync(parallelism, this.OnJobEvent)
             .SelectMany(e => e)
             .CollectOption()
@@ -86,7 +61,7 @@ public class StreamingJobOperatorService : IStreamingJobOperatorService
 
     private Task<List<Option<KubernetesCommand>>> OnJobAdded(V1Job job)
     {
-        return this.streamDefinitionCollection
+        return streamDefinitionCollection
             .Get(job.Name(), job.ToOwnerApiRequest())
             .Map(maybeSd => maybeSd switch
             {
@@ -110,7 +85,7 @@ public class StreamingJobOperatorService : IStreamingJobOperatorService
         var streamId = job.GetStreamId();
         if (job.IsStopping())
         {
-            this.logger.LogInformation("Streaming job for stream with id {streamId} is already stopping",
+            logger.LogInformation("Streaming job for stream with id {streamId} is already stopping",
                 streamId);
             return Option<KubernetesCommand>.None;
         }
@@ -125,7 +100,7 @@ public class StreamingJobOperatorService : IStreamingJobOperatorService
 
     private Task<List<Option<KubernetesCommand>>> OnJobDelete(V1Job job)
     {
-        return this.streamDefinitionCollection
+        return streamDefinitionCollection
             .Get(job.Name(), job.ToOwnerApiRequest())
             .Map(maybeSd => maybeSd switch
             {
@@ -153,10 +128,10 @@ public class StreamingJobOperatorService : IStreamingJobOperatorService
 
     private Task HandleCommand(KubernetesCommand response) => response switch
     {
-        UpdateStatusCommand sdc => this.updateStatusCommandHandler.Handle(sdc),
-        StreamingJobCommand sjc => this.streamingJobCommandHandler.Handle(sjc),
-        SetAnnotationCommand<IStreamDefinition> sac => this.setAnnotationCommandHandler.Handle(sac),
-        RemoveAnnotationCommand<IStreamDefinition> command => this.removeAnnotationHandler.Handle(command),
+        UpdateStatusCommand sdc => updateStatusCommandHandler.Handle(sdc),
+        StreamingJobCommand sjc => streamingJobCommandHandler.Handle(sjc),
+        SetAnnotationCommand<IStreamDefinition> sac => setAnnotationCommandHandler.Handle(sac),
+        RemoveAnnotationCommand<IStreamDefinition> command => removeAnnotationHandler.Handle(command),
         _ => throw new ArgumentOutOfRangeException(nameof(response), response, null)
     };
 }

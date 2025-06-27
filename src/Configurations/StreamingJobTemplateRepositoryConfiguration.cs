@@ -11,5 +11,5 @@ namespace Arcane.Operator.Configurations;
 [ExcludeFromCodeCoverage(Justification = "Model")]
 public class StreamingJobTemplateRepositoryConfiguration
 {
-    public CustomResourceConfiguration ResourceConfiguration { get; set; }
+    public CustomResourceConfiguration ResourceConfiguration { get; set; } = new();
 }
