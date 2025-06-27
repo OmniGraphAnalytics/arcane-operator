@@ -1,6 +1,4 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
-using Arcane.Operator.Services.Metrics;
+﻿using System.Diagnostics.CodeAnalysis;
 using Arcane.Operator.Services.Metrics.Actors;
 
 namespace Arcane.Operator.Configurations;
@@ -14,10 +12,10 @@ public class MetricsPublisherActorConfiguration
     /// <summary>
     /// Interval to publish metrics
     /// </summary>
-    public TimeSpan UpdateInterval { get; set; }
+    public TimeSpan UpdateInterval { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Initial delay for the first metrics publication
     /// </summary>
-    public TimeSpan InitialDelay { get; set; }
+    public TimeSpan InitialDelay { get; set; } = TimeSpan.FromSeconds(10);
 };

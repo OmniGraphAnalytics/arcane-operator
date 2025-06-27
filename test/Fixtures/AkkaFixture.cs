@@ -7,8 +7,8 @@ public class AkkaFixture
 {
     public AkkaFixture()
     {
-        this.ActorSystem = ActorSystem.Create(nameof(AkkaFixture));
-        this.Materializer = this.ActorSystem.Materializer();
+        ActorSystem = ActorSystem.Create(nameof(AkkaFixture));
+        Materializer = ActorSystem.Materializer();
     }
 
     public ActorSystem ActorSystem { get; }

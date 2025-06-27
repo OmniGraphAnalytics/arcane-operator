@@ -39,8 +39,8 @@ public class V1Beta1StreamingJobTemplate : IStreamingJobTemplate
         {
             ApiVersion = "batch/v1",
             Kind = "Job",
-            Metadata = this.Spec.Metadata ?? new V1ObjectMeta(),
-            Spec = this.Spec.Template.Spec
+            Metadata = Spec.Metadata ?? new V1ObjectMeta(),
+            Spec = Spec.Template.Spec,
         };
     }
 }

@@ -1,36 +1,55 @@
-name: Run tests with coverage
+name: "Test, Build and Publish Image"
+run-name: "Test & Build Image `${{ github.event_name }}`: `${{ github.ref_name }}`"
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
-    
+  workflow_run:
+    workflows: ["Release a new version"]
+    types:
+      - completed
+  workflow_dispatch:
+
 env:
   PROJECT_NAME: Arcane.Operator
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  
+  IMAGE_NAME: arcane-operator
+  URL: "ghcr.io/omnigraphanalytics"
+  ARCH: "linux/amd64,linux/arm64"
+
+permissions: write-all
+
 jobs:
   validate_commit:
-    name: Validate commit
+    name: Validate Code and Publish Coverage
     runs-on: ubuntu-latest
     if: ${{ github.ref != 'refs/heads/main' }}
+
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4.0.0
+        name: Checkout head commit
         with:
-          dotnet-version: 8.0.x
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - name: Add GitHub NuGet Source
+        run: dotnet nuget add source https://nuget.pkg.github.com/OmniGraphAnalytics/index.json -n github --username USERNAME --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text
 
       - name: Restore dependencies
-        run: dotnet clean && dotnet nuget locals all --clear && dotnet restore
+        run: dotnet restore --locked-mode
+
+      - name: Build
+        run: dotnet build --no-restore
 
       - name: Test
         working-directory: ./test
         run: |
-          dotnet add package coverlet.msbuild
+          dotnet add package coverlet.msbuild &&
           dotnet test ${PROJECT_NAME}.Tests.csproj --configuration Debug --runtime linux-x64 /p:CollectCoverage=true /p:CoverletOutput=Coverage/ /p:CoverletOutputFormat=lcov --logger GitHubActions
 
       - name: Publish Code Coverage
@@ -39,66 +58,117 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           lcov-file: ./test/Coverage/coverage.info
-              
-      - name: Check style
-        run: dotnet format --verify-no-changes
-          
-  build_image:
-    name: Build Docker Image and Helm Charts
-    runs-on: ubuntu-latest
-    needs: [ validate_commit ]
-    if: ${{ always() && (needs.validate_commit.result == 'success' || needs.validate_commit.result == 'skipped') }}
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with: 
-          fetch-depth: 0
-      
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3.3.0
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get project version
-        uses: SneaksAndData/github-actions/generate_version@v0.1.6
+      - name: Import Secrets
+        uses: hashicorp/vault-action@v3
+        with:
+          url: https://vault.gcpp.omnigraph.io/
+          role: github
+          method: jwt
+          secrets: |
+            /secret/data/manual/sonarcloud/token token | SONAR_TOKEN;
+
+  build_chart:
+    name: Build Helm Chart
+    runs-on:
+      labels: ubuntu-latest
+    if: ${{ always() }}
+
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout head commit
+        if: ${{ github.ref != 'refs/heads/main' && always() }}
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/checkout@v4
+        name: Checkout main
+        if: ${{ github.ref == 'refs/heads/main' && always() }}
+        with:
+          fetch-depth: 0
+
+      - name: Build and Push Chart
+        uses: SneaksAndData/github-actions/build_helm_chart@v0.1.11
+        with:
+          helm_directory: '.chart'
+          application: ${{ env.IMAGE_NAME }}
+          container_registry_user: "token"
+          container_registry_token: ${{ secrets.GITHUB_TOKEN }}
+          container_registry_address: ${{ env.URL }}
+
+  build_images:
+    name: Build Image ${{ matrix.project }}
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout head commit
+        if: ${{ github.ref != 'refs/heads/main' && always() }}
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/checkout@v4
+        name: Checkout main
+        if: ${{ github.ref == 'refs/heads/main' && always() }}
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          use: true
+          platforms: ${{ env.ARCH }}
+
+      - name: Get the project version
+        uses: SneaksAndData/github-actions/generate_version@v0.1.11
         id: version
 
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Add Image Prefix (add dev- on non-release branches)
+        id: image_prefix
+        run: | # Check if the branch is main or github.event.workflow_run.head_branch is main (when triggered by release workflow)
+          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.event.workflow_run.head_branch }}" == "refs/heads/main" ]]; then
+              echo "prefix=" >> "$GITHUB_OUTPUT"
+          else
+              echo "prefix=dev-" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.URL }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}},value=${{steps.version.outputs.version}}
-          flavor:
-            latest=false
+            type=semver,pattern={{raw}},value=${{steps.version.outputs.version}},prefix=${{steps.image_prefix.outputs.prefix}}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.3.0
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
-          use: true
-          platforms: linux/arm64,linux/amd64
+          username: 'token'
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ env.URL }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5.3.0
+      - name: Set up SHA for Datadog Source Code Integration
+        id: set_dd_sha
+        run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build and Push Image
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: .container/Dockerfile
+          file: .image/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/arm64,linux/amd64
-
-      - name: Build and Push Chart
-        uses: SneaksAndData/github-actions/build_helm_chart@v0.1.8
-        with:
-          application: arcane-operator
-          app_version: ${{ steps.meta.outputs.version }}
-          container_registry_user: ${{ github.actor }}
-          container_registry_token: ${{ secrets.GITHUB_TOKEN }}
-          container_registry_address: ghcr.io/sneaksanddata/
+          platforms: ${{ env.ARCH }}
+          build-args: |
+            PROJECT_NAME=${{ env.PROJECT_NAME }}
+            COMPONENT=operator
+            NUGET_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            DD_GIT_REPOSITORY_URL=${{ github.repositoryUrl }}
+            DD_GIT_COMMIT_SHA=${{ steps.set_dd_sha.outputs.sha }}
+          secrets: |
+            "nuget_token=${{ secrets.GITHUB_TOKEN }}"

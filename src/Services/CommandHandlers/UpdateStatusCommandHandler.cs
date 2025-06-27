@@ -1,100 +1,86 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Akka.Util;
+﻿using Akka.Util;
 using Arcane.Operator.Extensions;
 using Arcane.Operator.Models.Api;
 using Arcane.Operator.Models.Commands;
 using Arcane.Operator.Models.Resources.Status.V1Alpha1;
 using Arcane.Operator.Models.Resources.StreamClass.Base;
 using Arcane.Operator.Models.StreamDefinitions.Base;
-using Arcane.Operator.Services.Base;
 using Arcane.Operator.Services.Base.CommandHandlers;
 using Arcane.Operator.Services.Base.Repositories.CustomResources;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
-using Snd.Sdk.Kubernetes.Base;
-using Snd.Sdk.Tasks;
+using OmniModels.Extensions;
+using OmniModels.Services.Base;
 
 namespace Arcane.Operator.Services.CommandHandlers;
 
-public class UpdateStatusCommandHandler : ICommandHandler<UpdateStatusCommand>,
-    ICommandHandler<SetStreamClassStatusCommand>
+public class UpdateStatusCommandHandler(
+    IKubeCluster kubeCluster,
+    IStreamClassRepository streamClassRepository,
+    ILogger<UpdateStatusCommandHandler> logger)
+    : ICommandHandler<UpdateStatusCommand>,
+        ICommandHandler<SetStreamClassStatusCommand>
 {
-    private readonly ILogger<UpdateStatusCommandHandler> logger;
-    private readonly IKubeCluster kubeCluster;
-    private readonly IStreamClassRepository streamClassRepository;
-
-    public UpdateStatusCommandHandler(
-        IKubeCluster kubeCluster,
-        IStreamClassRepository streamClassRepository,
-        ILogger<UpdateStatusCommandHandler> logger)
+    public Task Handle(SetStreamClassStatusCommand command)
     {
-        this.logger = logger;
-        this.kubeCluster = kubeCluster;
-        this.streamClassRepository = streamClassRepository;
+        var status = new V1Alpha1StreamStatus
+        {
+            Phase = command.phase.ToString(),
+            Conditions = command.conditions.ToArray(),
+        };
+
+        return kubeCluster.UpdateCustomResourceStatus(
+                group: command.request.ApiGroup,
+                version: command.request.ApiVersion,
+                plural: command.request.PluralName,
+                crdNamespace: command.request.Namespace,
+                resourceName: command.resourceName,
+                status: status,
+                converter: element => element.AsOptionalStreamClass())
+            .TryMap(selector: success => OnSuccess(maybeStreamClass: success, phase: command.phase),
+                errorHandler: exception => OnFailure(exception: exception, request: command.request));
     }
 
     /// <inheritdoc cref="ICommandHandler{T}.Handle" />
     public Task Handle(UpdateStatusCommand command)
     {
         var ((nameSpace, kind, streamId), conditions, phase) = command;
-        return this.streamClassRepository.Get(nameSpace, kind).FlatMap(crdConf =>
+        return streamClassRepository.Get(nameSpace: nameSpace, streamDefinitionKind: kind).FlatMap(crdConf =>
         {
             if (crdConf is { HasValue: false })
             {
-                this.logger.LogError("Failed to get configuration for kind {kind}", kind);
+                logger.LogError(message: "Failed to get configuration for kind {kind}", kind);
                 return Task.FromResult(Option<IStreamDefinition>.None);
             }
 
             var status = new V1Alpha1StreamStatus { Phase = phase.ToString(), Conditions = conditions };
 
-            this.logger.LogInformation(
-                "Status and phase of stream with kind {kind} and id {streamId} changed to {statuses}, {phase}",
+            logger.LogInformation(
+                message: "Status and phase of stream with kind {kind} and id {streamId} changed to {statuses}, {phase}",
                 kind,
                 streamId,
-                string.Join(", ", conditions.Select(sc => sc.Type)),
+                string.Join(separator: ", ", values: conditions.Select(sc => sc.Type)),
                 phase);
 
-            return this.kubeCluster.UpdateCustomResourceStatus(
-                crdConf.Value.ApiGroupRef,
-                crdConf.Value.VersionRef,
-                crdConf.Value.PluralNameRef,
-                nameSpace,
-                streamId,
-                status,
-                element => element.AsOptionalStreamDefinition());
+            return kubeCluster.UpdateCustomResourceStatus(
+                group: crdConf.Value.ApiGroupRef,
+                version: crdConf.Value.VersionRef,
+                plural: crdConf.Value.PluralNameRef,
+                crdNamespace: nameSpace,
+                resourceName: streamId,
+                status: status,
+                converter: element => element.AsOptionalStreamDefinition());
         });
-    }
-
-    public Task Handle(SetStreamClassStatusCommand command)
-    {
-        var status = new V1Alpha1StreamStatus
-        {
-            Phase = command.phase.ToString(),
-            Conditions = command.conditions.ToArray()
-        };
-
-        return this.kubeCluster.UpdateCustomResourceStatus(
-                command.request.ApiGroup,
-                command.request.ApiVersion,
-                command.request.PluralName,
-                command.request.Namespace,
-                command.resourceName,
-                status,
-                element => element.AsOptionalStreamClass())
-            .TryMap(success => this.OnSuccess(success, command.phase),
-                exception => this.OnFailure(exception, command.request));
     }
 
     private Option<IStreamClass> OnSuccess(Option<IStreamClass> maybeStreamClass, StreamClassPhase phase)
     {
         if (maybeStreamClass is { HasValue: false })
         {
-            this.logger.LogError("Failed to get stream definition");
+            logger.LogError("Failed to get stream definition");
         }
 
-        this.logger.LogInformation("The phase of the stream class {namespace}/{name} changed to {status}",
+        logger.LogInformation(message: "The phase of the stream class {namespace}/{name} changed to {status}",
             maybeStreamClass.Value.Metadata.Namespace(),
             maybeStreamClass.Value.Metadata.Name,
             phase);
@@ -104,7 +90,7 @@ public class UpdateStatusCommandHandler : ICommandHandler<UpdateStatusCommand>,
 
     private Option<IStreamClass> OnFailure(Exception exception, CustomResourceApiRequest request)
     {
-        this.logger.LogError(exception, "Failed to update stream class status for {@request}", request);
+        logger.LogError(exception: exception, message: "Failed to update stream class status for {@request}", request);
         return Option<IStreamClass>.None;
     }
 }

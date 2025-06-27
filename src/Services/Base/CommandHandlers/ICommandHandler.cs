@@ -1,7 +1,7 @@
-﻿using System.Threading.Tasks;
-using Arcane.Operator.Models.Base;
+﻿using Arcane.Operator.Models.Base;
 
 namespace Arcane.Operator.Services.Base.CommandHandlers;
+
 /// <summary>
 /// Base interface for Kubernetes command handlers
 /// </summary>

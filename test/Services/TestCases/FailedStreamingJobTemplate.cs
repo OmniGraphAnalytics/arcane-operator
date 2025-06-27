@@ -18,21 +18,24 @@ public class FailedStreamingJobTemplate : IStreamingJobTemplate
 
     public string ApiVersion
     {
-        get => throw this.exception;
-        set => throw this.exception;
+        get => throw exception;
+        set => throw exception;
     }
 
     public string Kind
     {
-        get => throw this.exception;
-        set => throw this.exception;
+        get => throw exception;
+        set => throw exception;
     }
 
     public V1ObjectMeta Metadata
     {
-        get => throw this.exception;
-        set => throw this.exception;
+        get => throw exception;
+        set => throw exception;
     }
 
-    public V1Job GetJob() => throw this.exception;
+    public V1Job GetJob()
+    {
+        throw exception;
+    }
 }

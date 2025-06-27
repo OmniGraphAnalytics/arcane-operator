@@ -21,7 +21,7 @@ public enum ResourceStatus
     /// <summary>
     /// The stream is in a warning state.
     /// </summary>
-    WARNING
+    WARNING,
 }
 
 /// <summary>
@@ -54,36 +54,40 @@ public class V1Alpha1StreamCondition
             new V1Alpha1StreamCondition
             {
                 Type = ResourceStatus.ERROR.ToString(),
-                Status = "True"
-            }
+                Status = "True",
+            },
         };
+
     public static V1Alpha1StreamCondition[] WarningCondition =>
         new[]
         {
             new V1Alpha1StreamCondition
             {
                 Type = ResourceStatus.WARNING.ToString(),
-                Status = "True"
-            }
+                Status = "True",
+            },
         };
+
     public static V1Alpha1StreamCondition[] ReadyCondition =>
         new[]
         {
             new V1Alpha1StreamCondition
             {
                 Type = ResourceStatus.READY.ToString(),
-                Status = "True"
-            }
+                Status = "True",
+            },
         };
 
-    public static V1Alpha1StreamCondition[] CustomErrorCondition(string message) =>
-        new[]
+    public static V1Alpha1StreamCondition[] CustomErrorCondition(string message)
+    {
+        return new[]
         {
             new V1Alpha1StreamCondition
             {
                 Type = ResourceStatus.ERROR.ToString(),
                 Status = "True",
-                Message = message
-            }
+                Message = message,
+            },
         };
+    }
 }

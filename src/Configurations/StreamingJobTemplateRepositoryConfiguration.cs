@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Arcane.Operator.Configurations.Common;
-using Arcane.Operator.Services.Repositories;
 using Arcane.Operator.Services.Repositories.CustomResources;
 
 namespace Arcane.Operator.Configurations;
@@ -11,5 +10,5 @@ namespace Arcane.Operator.Configurations;
 [ExcludeFromCodeCoverage(Justification = "Model")]
 public class StreamingJobTemplateRepositoryConfiguration
 {
-    public CustomResourceConfiguration ResourceConfiguration { get; set; }
+    public CustomResourceConfiguration ResourceConfiguration { get; set; } = new();
 }

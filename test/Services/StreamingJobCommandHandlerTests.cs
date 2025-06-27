@@ -20,7 +20,7 @@ using k8s.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Snd.Sdk.Kubernetes.Base;
+using OmniModels.Services.Base;
 using Xunit;
 using static Arcane.Operator.Tests.Services.TestCases.StreamDefinitionTestCases;
 using static Arcane.Operator.Tests.Services.TestCases.StreamClassTestCases;
@@ -42,14 +42,14 @@ public class StreamingJobCommandHandlerTests(LoggerFixture loggerFixture) : ICla
     public async Task HandleStreamStopCommand()
     {
         // Arrange
-        var command = new StopJob("job-name", "job-namespace");
-        var service = this.CreateServiceProvider().GetRequiredService<ICommandHandler<StreamingJobCommand>>();
+        var command = new StopJob(name: "job-name", nameSpace: "job-namespace");
+        var service = CreateServiceProvider().GetRequiredService<ICommandHandler<StreamingJobCommand>>();
 
         // Act
         await service.Handle(command);
 
         // Assert
-        this.kubeClusterMock.Verify(k => k.DeleteJob(command.name,
+        kubeClusterMock.Verify(k => k.DeleteJob(command.name,
             command.nameSpace,
             It.IsAny<CancellationToken>(),
             It.IsAny<PropagationPolicy>()));
@@ -61,30 +61,30 @@ public class StreamingJobCommandHandlerTests(LoggerFixture loggerFixture) : ICla
     public async Task HandleStreamStartCommand(bool isBackfilling)
     {
         // Arrange
-        var command = new StartJob(StreamDefinition, isBackfilling);
-        var service = this.CreateServiceProvider().GetRequiredService<ICommandHandler<StreamingJobCommand>>();
-        this.streamClassRepositoryMock
+        var command = new StartJob(streamDefinition: StreamDefinition, IsBackfilling: isBackfilling);
+        var service = CreateServiceProvider().GetRequiredService<ICommandHandler<StreamingJobCommand>>();
+        streamClassRepositoryMock
             .Setup(scr => scr.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(StreamClass.AsOption());
-        this.streamingJobTemplateRepositoryMock
+        streamingJobTemplateRepositoryMock
             .Setup(sjtr => sjtr.GetStreamingJobTemplate(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(((IStreamingJobTemplate)StreamingJobTemplate).AsOption());
-        var expectedState = isBackfilling ? StreamPhase.RELOADING.ToString() : StreamPhase.RUNNING.ToString();
+        var expectedState = isBackfilling ? nameof(StreamPhase.RELOADING) : nameof(StreamPhase.RUNNING);
 
         // Act
         await service.Handle(command);
 
         // Assert
-        this.kubeClusterMock.Verify(k =>
+        kubeClusterMock.Verify(k =>
             k.SendJob(It.Is<V1Job>(job => job.IsBackfilling() == isBackfilling), It.IsAny<string>(), It.IsAny<CancellationToken>()));
-        this.kubeClusterMock.Verify(k => k.UpdateCustomResourceStatus(It.IsAny<string>(),
+        kubeClusterMock.Verify(expression: k => k.UpdateCustomResourceStatus(It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 StreamDefinition.Namespace(),
                 StreamDefinition.Name(),
                 It.Is<V1Alpha1StreamStatus>(s => s.Phase == expectedState),
                 It.IsAny<Func<JsonElement, It.IsAnyType>>()),
-            Times.Once);
+            times: Times.Once);
     }
 
     [Theory]
@@ -94,17 +94,17 @@ public class StreamingJobCommandHandlerTests(LoggerFixture loggerFixture) : ICla
     public async Task HandleStreamStartFail(HttpStatusCode statusCode, StreamPhase expectedPhase)
     {
         // Arrange
-        var command = new StartJob(StreamDefinition, false);
-        var service = this.CreateServiceProvider().GetRequiredService<ICommandHandler<StreamingJobCommand>>();
-        this.kubeClusterMock.Setup(k => k.SendJob(It.IsAny<V1Job>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        var command = new StartJob(streamDefinition: StreamDefinition, IsBackfilling: false);
+        var service = CreateServiceProvider().GetRequiredService<ICommandHandler<StreamingJobCommand>>();
+        kubeClusterMock.Setup(k => k.SendJob(It.IsAny<V1Job>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.FromException<V1JobStatus>(new HttpOperationException
             {
-                Response = new HttpResponseMessageWrapper(new HttpResponseMessage { StatusCode = statusCode }, "")
+                Response = new HttpResponseMessageWrapper(httpResponse: new HttpResponseMessage { StatusCode = statusCode }, content: ""),
             }));
-        this.streamClassRepositoryMock
+        streamClassRepositoryMock
             .Setup(scr => scr.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(StreamClass.AsOption());
-        this.streamingJobTemplateRepositoryMock
+        streamingJobTemplateRepositoryMock
             .Setup(sjtr => sjtr.GetStreamingJobTemplate(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(((IStreamingJobTemplate)StreamingJobTemplate).AsOption());
         var expectedState = expectedPhase.ToString();
@@ -113,14 +113,14 @@ public class StreamingJobCommandHandlerTests(LoggerFixture loggerFixture) : ICla
         await service.Handle(command);
 
         // Assert
-        this.kubeClusterMock.Verify(k => k.UpdateCustomResourceStatus(It.IsAny<string>(),
+        kubeClusterMock.Verify(expression: k => k.UpdateCustomResourceStatus(It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 StreamDefinition.Namespace(),
                 StreamDefinition.Name(),
                 It.Is<V1Alpha1StreamStatus>(s => s.Phase == expectedState),
                 It.IsAny<Func<JsonElement, It.IsAnyType>>()),
-            Times.Once);
+            times: Times.Once);
     }
 
     [Theory]
@@ -129,12 +129,12 @@ public class StreamingJobCommandHandlerTests(LoggerFixture loggerFixture) : ICla
     public async Task HandleFailedStreamTemplate(bool isBackfilling)
     {
         // Arrange
-        var command = new StartJob(StreamDefinition, isBackfilling);
-        var service = this.CreateServiceProvider().GetRequiredService<ICommandHandler<StreamingJobCommand>>();
-        this.streamClassRepositoryMock
+        var command = new StartJob(streamDefinition: StreamDefinition, IsBackfilling: isBackfilling);
+        var service = CreateServiceProvider().GetRequiredService<ICommandHandler<StreamingJobCommand>>();
+        streamClassRepositoryMock
             .Setup(scr => scr.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(StreamClass.AsOption());
-        this.streamingJobTemplateRepositoryMock
+        streamingJobTemplateRepositoryMock
             .Setup(sjtr => sjtr.GetStreamingJobTemplate(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(((IStreamingJobTemplate)new FailedStreamingJobTemplate(new Exception())).AsOption());
 
@@ -142,14 +142,14 @@ public class StreamingJobCommandHandlerTests(LoggerFixture loggerFixture) : ICla
         await service.Handle(command);
 
         // Assert
-        this.kubeClusterMock.Verify(k => k.UpdateCustomResourceStatus(It.IsAny<string>(),
+        kubeClusterMock.Verify(expression: k => k.UpdateCustomResourceStatus(It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 StreamDefinition.Namespace(),
                 StreamDefinition.Name(),
-                It.Is<V1Alpha1StreamStatus>(s => s.Phase == StreamPhase.FAILED.ToString()),
+                It.Is<V1Alpha1StreamStatus>(s => s.Phase == nameof(StreamPhase.FAILED)),
                 It.IsAny<Func<JsonElement, It.IsAnyType>>()),
-            Times.Once);
+            times: Times.Once);
     }
 
     [Theory]
@@ -158,18 +158,18 @@ public class StreamingJobCommandHandlerTests(LoggerFixture loggerFixture) : ICla
     public async Task HandleFailedSendJob(bool isBackfilling)
     {
         // Arrange
-        var command = new StartJob(StreamDefinition, isBackfilling);
-        var service = this.CreateServiceProvider().GetRequiredService<ICommandHandler<StreamingJobCommand>>();
+        var command = new StartJob(streamDefinition: StreamDefinition, IsBackfilling: isBackfilling);
+        var service = CreateServiceProvider().GetRequiredService<ICommandHandler<StreamingJobCommand>>();
 
-        this.streamClassRepositoryMock
+        streamClassRepositoryMock
             .Setup(scr => scr.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(StreamClass.AsOption());
 
-        this.streamingJobTemplateRepositoryMock
+        streamingJobTemplateRepositoryMock
             .Setup(sjtr => sjtr.GetStreamingJobTemplate(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(((IStreamingJobTemplate)new FailedStreamingJobTemplate(new Exception())).AsOption());
 
-        this.kubeClusterMock
+        kubeClusterMock
             .Setup(k => k.SendJob(It.IsAny<V1Job>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Throws<Exception>();
 
@@ -177,22 +177,22 @@ public class StreamingJobCommandHandlerTests(LoggerFixture loggerFixture) : ICla
         await service.Handle(command);
 
         // Assert
-        this.kubeClusterMock.Verify(k => k.UpdateCustomResourceStatus(It.IsAny<string>(),
+        kubeClusterMock.Verify(expression: k => k.UpdateCustomResourceStatus(It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 StreamDefinition.Namespace(),
                 StreamDefinition.Name(),
-                It.Is<V1Alpha1StreamStatus>(s => s.Phase == StreamPhase.FAILED.ToString()),
+                It.Is<V1Alpha1StreamStatus>(s => s.Phase == nameof(StreamPhase.FAILED)),
                 It.IsAny<Func<JsonElement, It.IsAnyType>>()),
-            Times.Once);
+            times: Times.Once);
     }
 
     private ServiceProvider CreateServiceProvider()
     {
         return new ServiceCollection()
-            .AddSingleton(this.kubeClusterMock.Object)
-            .AddSingleton(this.streamClassRepositoryMock.Object)
-            .AddSingleton(this.streamingJobTemplateRepositoryMock.Object)
+            .AddSingleton(kubeClusterMock.Object)
+            .AddSingleton(streamClassRepositoryMock.Object)
+            .AddSingleton(streamingJobTemplateRepositoryMock.Object)
             .AddSingleton(loggerFixture.Factory.CreateLogger<StreamingJobCommandHandler>())
             .AddSingleton(loggerFixture.Factory.CreateLogger<UpdateStatusCommandHandler>())
             .AddSingleton<ICommandHandler<UpdateStatusCommand>, UpdateStatusCommandHandler>()

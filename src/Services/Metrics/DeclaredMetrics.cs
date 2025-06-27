@@ -1,10 +1,8 @@
-﻿using System.Collections.Generic;
-using Arcane.Operator.Extensions;
-using Arcane.Operator.Models;
+﻿using Arcane.Operator.Extensions;
 using Arcane.Operator.Models.Commands;
 using k8s;
 using k8s.Models;
-using Snd.Sdk.Helpers;
+using OmniModels.Extensions;
 
 namespace Arcane.Operator.Services.Metrics;
 
@@ -14,27 +12,40 @@ public static class DeclaredMetrics
     /// Prefix for metrics published by the Arcane Operator
     /// </summary>
     private const string TAG_PREFIX = "arcane.sneaksanddata.com";
-    public static string TrafficMetricName(this WatchEventType eventType) => $"objects.{eventType.ToString().ToLowerInvariant()}";
 
-    public static SortedDictionary<string, string> GetMetricsTags(this IKubernetesObject<V1ObjectMeta> job) => new()
+    public static string TrafficMetricName(this WatchEventType eventType)
     {
-        { $"{TAG_PREFIX}/namespace", job.Namespace() },
-        { $"{TAG_PREFIX}/kind", job.Kind },
-        { $"{TAG_PREFIX}/name", job.Name() },
-    };
+        return $"objects.{eventType.ToString().ToLowerInvariant()}";
+    }
 
-    public static SortedDictionary<string, string> GetMetricsTags(this V1Job job) => new()
+    public static SortedDictionary<string, string> GetMetricsTags(this IKubernetesObject<V1ObjectMeta> job)
     {
-        { $"{TAG_PREFIX}/namespace", job.Namespace() },
-        { $"{TAG_PREFIX}/kind", job.GetStreamKind() },
-        { $"{TAG_PREFIX}/stream_id", job.GetStreamId() }
-    };
+        return new SortedDictionary<string, string>
+        {
+            { $"{TAG_PREFIX}/namespace", job.Namespace() },
+            { $"{TAG_PREFIX}/kind", job.Kind },
+            { $"{TAG_PREFIX}/name", job.Name() },
+        };
+    }
 
-    public static SortedDictionary<string, string> GetMetricsTags(this SetStreamClassStatusCommand s) => new()
+    public static SortedDictionary<string, string> GetMetricsTags(this V1Job job)
     {
-        { $"{TAG_PREFIX}/namespace", s.streamClass?.Namespace().ToLowerInvariant() },
-        { $"{TAG_PREFIX}/kind_ref", CodeExtensions.CamelCaseToSnakeCase(s.streamClass?.KindRef ?? "unknown") },
-        { $"{TAG_PREFIX}/kind", CodeExtensions.CamelCaseToSnakeCase(s.streamClass?.Kind ?? "unknown") },
-        { $"{TAG_PREFIX}/phase", s.phase.ToString().ToLowerInvariant() }
-    };
+        return new SortedDictionary<string, string>
+        {
+            { $"{TAG_PREFIX}/namespace", job.Namespace() },
+            { $"{TAG_PREFIX}/kind", job.GetStreamKind() },
+            { $"{TAG_PREFIX}/stream_id", job.GetStreamId() },
+        };
+    }
+
+    public static SortedDictionary<string, string> GetMetricsTags(this SetStreamClassStatusCommand s)
+    {
+        return new SortedDictionary<string, string>
+        {
+            { $"{TAG_PREFIX}/namespace", s.streamClass?.Namespace().ToLowerInvariant() },
+            { $"{TAG_PREFIX}/kind_ref", CodeExtensions.CamelCaseToSnakeCase(s.streamClass?.KindRef ?? "unknown") },
+            { $"{TAG_PREFIX}/kind", CodeExtensions.CamelCaseToSnakeCase(s.streamClass?.Kind ?? "unknown") },
+            { $"{TAG_PREFIX}/phase", s.phase.ToString().ToLowerInvariant() },
+        };
+    }
 }

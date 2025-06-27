@@ -39,9 +39,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Snd.Sdk.Kubernetes;
-using Snd.Sdk.Kubernetes.Base;
-using Snd.Sdk.Metrics.Base;
+using OmniModels.Services.Base;
 using Xunit;
 using static Arcane.Operator.Tests.Services.TestCases.JobTestCases;
 using static Arcane.Operator.Tests.Services.TestCases.StreamDefinitionTestCases;
@@ -54,42 +52,49 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
 {
     // Akka service and test helpers
     private readonly ActorSystem actorSystem = ActorSystem.Create(nameof(StreamOperatorServiceTests));
-    private readonly LoggerFixture loggerFixture;
-    private readonly ActorMaterializer materializer;
+    private readonly CancellationTokenSource cts = new();
 
     // Mocks
     private readonly Mock<IKubeCluster> kubeClusterMock = new();
-    private readonly Mock<IStreamingJobCollection> streamingJobOperatorServiceMock = new();
-    private readonly Mock<IReactiveResourceCollection<IStreamDefinition>> streamDefinitionRepositoryMock = new();
+    private readonly LoggerFixture loggerFixture;
+    private readonly ActorMaterializer materializer;
     private readonly Mock<IStreamClassRepository> streamClassRepositoryMock = new();
-    private readonly TaskCompletionSource tcs = new();
-    private readonly CancellationTokenSource cts = new();
+    private readonly Mock<IReactiveResourceCollection<IStreamDefinition>> streamDefinitionRepositoryMock = new();
+    private readonly Mock<IStreamingJobCollection> streamingJobOperatorServiceMock = new();
     private readonly Mock<IStreamingJobTemplateRepository> streamingJobTemplateRepositoryMock = new();
+    private readonly TaskCompletionSource tcs = new();
 
     public StreamOperatorServiceTests(LoggerFixture loggerFixture)
     {
         this.loggerFixture = loggerFixture;
-        this.materializer = this.actorSystem.Materializer();
-        this.streamClassRepositoryMock
+        materializer = actorSystem.Materializer();
+        streamClassRepositoryMock
             .Setup(c => c.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(StreamClass.AsOption());
-        this.cts.CancelAfter(TimeSpan.FromSeconds(5));
-        this.cts.Token.Register(this.tcs.SetResult);
-        this.streamingJobTemplateRepositoryMock
+        cts.CancelAfter(TimeSpan.FromSeconds(5));
+        cts.Token.Register(tcs.SetResult);
+        streamingJobTemplateRepositoryMock
             .Setup(s => s.GetStreamingJobTemplate(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(StreamingJobTemplate.AsOption<IStreamingJobTemplate>());
     }
 
+    public void Dispose()
+    {
+        actorSystem?.Dispose();
+        materializer?.Dispose();
+        cts?.Dispose();
+    }
+
     public static IEnumerable<object[]> GenerateSynchronizationTestCases()
     {
-        yield return new object[] { WatchEventType.Added, StreamDefinitionTestCases.StreamDefinition, true, false, false, false };
-        yield return new object[] { WatchEventType.Modified, StreamDefinitionTestCases.StreamDefinition, false, true, true, false };
-        yield return new object[] { WatchEventType.Modified, StreamDefinitionTestCases.StreamDefinition, false, true, false, false };
+        yield return [WatchEventType.Added, StreamDefinitionTestCases.StreamDefinition, true, false, false, false];
+        yield return [WatchEventType.Modified, StreamDefinitionTestCases.StreamDefinition, false, true, true, false];
+        yield return [WatchEventType.Modified, StreamDefinitionTestCases.StreamDefinition, false, true, false, false];
 
-        yield return new object[] { WatchEventType.Added, SuspendedStreamDefinition, false, false, false, false };
-        yield return new object[] { WatchEventType.Deleted, SuspendedStreamDefinition, false, false, false, false };
-        yield return new object[] { WatchEventType.Modified, SuspendedStreamDefinition, false, false, true, true };
-        yield return new object[] { WatchEventType.Modified, SuspendedStreamDefinition, false, false, false, false };
+        yield return [WatchEventType.Added, SuspendedStreamDefinition, false, false, false, false];
+        yield return [WatchEventType.Deleted, SuspendedStreamDefinition, false, false, false, false];
+        yield return [WatchEventType.Modified, SuspendedStreamDefinition, false, false, true, true];
+        yield return [WatchEventType.Modified, SuspendedStreamDefinition, false, false, false, false];
     }
 
     [Theory]
@@ -102,71 +107,71 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
         bool expectTermination)
     {
         // Arrange
-        this.SetupEventMock(eventType, streamDefinition);
+        SetupEventMock(eventType: eventType, streamDefinition: streamDefinition);
         streamingJobOperatorServiceMock
             .Setup(service => service.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(streamingJobExists ? JobWithChecksum("checksum").AsOption() : Option<V1Job>.None);
 
-        var task = this.tcs.Task;
-        this.kubeClusterMock
-             .Setup(service => service.SendJob(
-                 It.IsAny<V1Job>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-             .Callback(() => this.tcs.SetResult());
+        var task = tcs.Task;
+        kubeClusterMock
+            .Setup(service => service.SendJob(
+                It.IsAny<V1Job>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback(() => tcs.SetResult());
 
-        this.kubeClusterMock.Setup(c => c.AnnotateJob(It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<string>()))
-            .Callback(() => this.tcs.SetResult());
+        kubeClusterMock.Setup(c => c.AnnotateJob(It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Callback(() => tcs.SetResult());
 
-        this.kubeClusterMock
-             .Setup(service => service.DeleteJob(
-                 It.IsAny<string>(),
-                 It.IsAny<string>(),
-                 It.IsAny<CancellationToken>(),
-                 It.IsAny<PropagationPolicy>()))
-             .Callback(() => this.tcs.SetResult());
+        kubeClusterMock
+            .Setup(service => service.DeleteJob(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<PropagationPolicy>()))
+            .Callback(() => tcs.SetResult());
 
         // Act
-        var sp = this.CreateServiceProvider();
+        var sp = CreateServiceProvider();
         sp.GetRequiredService<IStreamOperatorService>().Attach(StreamClass);
         await task;
 
         // Assert
 
-        this.kubeClusterMock.Verify(service
+        kubeClusterMock.Verify(expression: service
                 => service.SendJob(
                     It.Is<V1Job>(job => job.IsBackfilling()),
                     It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(expectBackfill ? 1 : 0));
+            times: Times.Exactly(expectBackfill ? 1 : 0));
 
-        this.kubeClusterMock
-            .Verify(c => c.AnnotateJob(It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.Is<string>(a => a == Annotations.STATE_ANNOTATION_KEY),
-            It.Is<string>(a => a == Annotations.RESTARTING_STATE_ANNOTATION_VALUE)),
-            Times.Exactly(expectRestart && streamingJobExists ? 1 : 0));
+        kubeClusterMock
+            .Verify(expression: c => c.AnnotateJob(It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.Is<string>(a => a == Annotations.STATE_ANNOTATION_KEY),
+                    It.Is<string>(a => a == Annotations.RESTARTING_STATE_ANNOTATION_VALUE)),
+                times: Times.Exactly(expectRestart && streamingJobExists ? 1 : 0));
 
-        this.kubeClusterMock.Verify(service
+        kubeClusterMock.Verify(expression: service
                 => service.SendJob(
                     It.Is<V1Job>(job => !job.IsBackfilling()),
                     It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(expectRestart && !streamingJobExists ? 1 : 0));
+            times: Times.Exactly(expectRestart && !streamingJobExists ? 1 : 0));
 
-        this.kubeClusterMock.Verify(service
+        kubeClusterMock.Verify(expression: service
                 => service.DeleteJob(
                     It.IsAny<string>(),
                     It.IsAny<string>(),
                     It.IsAny<CancellationToken>(),
                     It.IsAny<PropagationPolicy>()),
-            Times.Exactly(expectTermination ? 1 : 0));
+            times: Times.Exactly(expectTermination ? 1 : 0));
     }
 
 
     public static IEnumerable<object[]> GenerateModifiedTestCases()
     {
-        yield return new object[] { StreamDefinitionTestCases.StreamDefinition, true, true };
-        yield return new object[] { StreamDefinitionTestCases.StreamDefinition, false, false };
+        yield return [StreamDefinitionTestCases.StreamDefinition, true, true];
+        yield return [StreamDefinitionTestCases.StreamDefinition, false, false];
     }
 
     [Theory]
@@ -175,38 +180,38 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
         bool jobChecksumChanged, bool expectRestart)
     {
         // Arrange
-        this.SetupEventMock(WatchEventType.Modified, streamDefinition);
+        SetupEventMock(eventType: WatchEventType.Modified, streamDefinition: streamDefinition);
         var mockJob = JobWithChecksum(jobChecksumChanged ? "checksum" : streamDefinition.GetConfigurationChecksum());
         streamingJobOperatorServiceMock
             .Setup(service => service.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(mockJob.AsOption());
 
-        var task = this.tcs.Task;
-        this.kubeClusterMock.Setup(c => c.AnnotateJob(It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<string>()))
-            .Callback(() => this.tcs.SetResult());
+        var task = tcs.Task;
+        kubeClusterMock.Setup(c => c.AnnotateJob(It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Callback(() => tcs.SetResult());
 
         // Act
-        var sp = this.CreateServiceProvider();
+        var sp = CreateServiceProvider();
         sp.GetRequiredService<IStreamOperatorService>().Attach(StreamClass);
         await task;
 
         // Assert
-        this.kubeClusterMock
-            .Verify(c => c.AnnotateJob(It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.Is<string>(a => a == Annotations.STATE_ANNOTATION_KEY),
-            It.Is<string>(a => a == Annotations.RESTARTING_STATE_ANNOTATION_VALUE)),
-            Times.Exactly(expectRestart ? 1 : 0));
+        kubeClusterMock
+            .Verify(expression: c => c.AnnotateJob(It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.Is<string>(a => a == Annotations.STATE_ANNOTATION_KEY),
+                    It.Is<string>(a => a == Annotations.RESTARTING_STATE_ANNOTATION_VALUE)),
+                times: Times.Exactly(expectRestart ? 1 : 0));
     }
 
 
     public static IEnumerable<object[]> GenerateReloadTestCases()
     {
-        yield return new object[] { ReloadRequestedStreamDefinition, true, true };
-        yield return new object[] { ReloadRequestedStreamDefinition, false, false };
+        yield return [ReloadRequestedStreamDefinition, true, true];
+        yield return [ReloadRequestedStreamDefinition, false, false];
     }
 
     [Theory]
@@ -214,54 +219,54 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
     public async Task TestStreamReload(StreamDefinition streamDefinition, bool jobExists, bool expectReload)
     {
         // Arrange
-        this.SetupEventMock(WatchEventType.Modified, streamDefinition);
+        SetupEventMock(eventType: WatchEventType.Modified, streamDefinition: streamDefinition);
         var mockJob = JobWithChecksum(streamDefinition.GetConfigurationChecksum());
         streamingJobOperatorServiceMock
             .Setup(service => service.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(jobExists ? mockJob.AsOption() : Option<V1Job>.None);
 
-        var task = this.tcs.Task;
-        this.kubeClusterMock.Setup(c => c.AnnotateJob(It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<string>()))
-            .Callback(() => this.tcs.SetResult());
-        this.kubeClusterMock
-             .Setup(service => service.SendJob(It.IsAny<V1Job>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-             .Callback(this.tcs.SetResult);
+        var task = tcs.Task;
+        kubeClusterMock.Setup(c => c.AnnotateJob(It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Callback(() => tcs.SetResult());
+        kubeClusterMock
+            .Setup(service => service.SendJob(It.IsAny<V1Job>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback(tcs.SetResult);
 
         // Act
-        var sp = this.CreateServiceProvider();
+        var sp = CreateServiceProvider();
         sp.GetRequiredService<IStreamOperatorService>().Attach(StreamClass);
         await task;
 
         // Assert
-        this.kubeClusterMock
-            .Verify(c => c.AnnotateJob(It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.Is<string>(a => a == Annotations.STATE_ANNOTATION_KEY),
-            It.Is<string>(a => a == Annotations.RELOADING_STATE_ANNOTATION_VALUE)),
-            Times.Exactly(expectReload ? 1 : 0));
+        kubeClusterMock
+            .Verify(expression: c => c.AnnotateJob(It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.Is<string>(a => a == Annotations.STATE_ANNOTATION_KEY),
+                    It.Is<string>(a => a == Annotations.RELOADING_STATE_ANNOTATION_VALUE)),
+                times: Times.Exactly(expectReload ? 1 : 0));
 
-        this.kubeClusterMock.Verify(service
+        kubeClusterMock.Verify(expression: service
                 => service.SendJob(It.Is<V1Job>(job => job.IsBackfilling()),
                     It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(expectReload ? 0 : 1));
+            times: Times.Exactly(expectReload ? 0 : 1));
     }
 
     public static IEnumerable<object[]> GenerateAddTestCases()
     {
-        yield return new object[] { ReloadRequestedStreamDefinition, true, true, false };
-        yield return new object[] { ReloadRequestedStreamDefinition, false, false, true };
-        yield return new object[] { ReloadRequestedStreamDefinition, true, false, false };
+        yield return [ReloadRequestedStreamDefinition, true, true, false];
+        yield return [ReloadRequestedStreamDefinition, false, false, true];
+        yield return [ReloadRequestedStreamDefinition, true, false, false];
 
-        yield return new object[] { StreamDefinitionTestCases.StreamDefinition, true, true, false };
-        yield return new object[] { StreamDefinitionTestCases.StreamDefinition, false, false, true };
-        yield return new object[] { StreamDefinitionTestCases.StreamDefinition, true, false, false };
+        yield return [StreamDefinitionTestCases.StreamDefinition, true, true, false];
+        yield return [StreamDefinitionTestCases.StreamDefinition, false, false, true];
+        yield return [StreamDefinitionTestCases.StreamDefinition, true, false, false];
 
-        yield return new object[] { SuspendedStreamDefinition, true, true, false };
-        yield return new object[] { SuspendedStreamDefinition, false, false, false };
-        yield return new object[] { SuspendedStreamDefinition, true, false, false };
+        yield return [SuspendedStreamDefinition, true, true, false];
+        yield return [SuspendedStreamDefinition, false, false, false];
+        yield return [SuspendedStreamDefinition, true, false, false];
     }
 
     [Theory]
@@ -270,37 +275,37 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
         bool expectStart)
     {
         // Arrange
-        this.SetupEventMock(WatchEventType.Added, streamDefinition);
+        SetupEventMock(eventType: WatchEventType.Added, streamDefinition: streamDefinition);
         streamingJobOperatorServiceMock
             .Setup(service => service.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(jobExists ? jobIsReloading ? ReloadingJob : RunningJob : Option<V1Job>.None);
 
-        var task = this.tcs.Task;
-        this.kubeClusterMock
+        var task = tcs.Task;
+        kubeClusterMock
             .Setup(service => service.SendJob(It.IsAny<V1Job>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback(this.tcs.SetResult);
+            .Callback(tcs.SetResult);
 
         // Act
-        var sp = this.CreateServiceProvider();
+        var sp = CreateServiceProvider();
         sp.GetRequiredService<IStreamOperatorService>().Attach(StreamClass);
         await task;
 
         // Assert
-        this.kubeClusterMock
-            .Verify(c => c.AnnotateJob(It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.Is<string>(a => a == Annotations.STATE_ANNOTATION_KEY),
-            It.Is<string>(a => a == Annotations.RELOADING_STATE_ANNOTATION_VALUE)),
-            Times.Exactly(0));
+        kubeClusterMock
+            .Verify(expression: c => c.AnnotateJob(It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.Is<string>(a => a == Annotations.STATE_ANNOTATION_KEY),
+                    It.Is<string>(a => a == Annotations.RELOADING_STATE_ANNOTATION_VALUE)),
+                times: Times.Exactly(0));
 
-        this.kubeClusterMock.Verify(service
+        kubeClusterMock.Verify(expression: service
                 => service.SendJob(It.Is<V1Job>(job => job.IsBackfilling()), It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(expectStart ? 1 : 0));
+            times: Times.Exactly(expectStart ? 1 : 0));
     }
 
     public static IEnumerable<object[]> GenerateRecoverableTestCases()
     {
-        yield return new object[] { FailedStreamDefinition(new JsonException()) };
+        yield return [FailedStreamDefinition(new JsonException())];
     }
 
     [Theory]
@@ -308,29 +313,28 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
     public async Task HandleBrokenStreamDefinition(FailedStreamDefinition streamDefinition)
     {
         // Arrange
-        this.streamDefinitionRepositoryMock.Setup(
-                cluster => cluster.GetEvents(It.IsAny<CustomResourceApiRequest>(), It.IsAny<int>()))
-            .Returns(Source.Single(new ResourceEvent<IStreamDefinition>(WatchEventType.Added, streamDefinition)));
+        streamDefinitionRepositoryMock.Setup(cluster => cluster.GetEvents(It.IsAny<CustomResourceApiRequest>(), It.IsAny<int>()))
+            .Returns(Source.Single(new ResourceEvent<IStreamDefinition>(EventType: WatchEventType.Added, kubernetesObject: streamDefinition)));
 
         streamingJobOperatorServiceMock
             .Setup(service => service.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(FailedJob.AsOption());
 
-        var task = this.tcs.Task;
+        var task = tcs.Task;
 
         // Act
-        var sp = this.CreateServiceProvider();
+        var sp = CreateServiceProvider();
         sp.GetRequiredService<IStreamOperatorService>().Attach(StreamClass);
         await task;
 
         // Assert
-        streamingJobOperatorServiceMock.Verify(service
-            => service.Get(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        streamingJobOperatorServiceMock.Verify(expression: service
+            => service.Get(It.IsAny<string>(), It.IsAny<string>()), times: Times.Never);
     }
 
     public static IEnumerable<object[]> GenerateFatalTestCases()
     {
-        yield return new object[] { FailedStreamDefinition(new BufferOverflowException("test")) };
+        yield return [FailedStreamDefinition(new BufferOverflowException("test"))];
     }
 
     [Theory]
@@ -338,17 +342,17 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
     public async Task HandleFatalException(FailedStreamDefinition streamDefinition)
     {
         // Arrange
-        this.streamDefinitionRepositoryMock.Setup(s =>
+        streamDefinitionRepositoryMock.Setup(s =>
                 s.GetEvents(It.IsAny<CustomResourceApiRequest>(), It.IsAny<int>()))
-            .Returns(Source.Single(new ResourceEvent<IStreamDefinition>(WatchEventType.Added, streamDefinition)));
+            .Returns(Source.Single(new ResourceEvent<IStreamDefinition>(EventType: WatchEventType.Added, kubernetesObject: streamDefinition)));
 
-        var task = this.tcs.Task;
+        var task = tcs.Task;
         streamingJobOperatorServiceMock
             .Setup(service => service.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(FailedJob.AsOption());
 
         // Act
-        var sp = this.CreateServiceProvider();
+        var sp = CreateServiceProvider();
         sp.GetRequiredService<IStreamOperatorService>().Attach(StreamClass);
         await task;
 
@@ -360,17 +364,17 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
     public async Task HandleBrokenStreamRepository()
     {
         // Arrange
-        this.streamDefinitionRepositoryMock.Setup(s
+        streamDefinitionRepositoryMock.Setup(s
                 => s.GetEvents(It.IsAny<CustomResourceApiRequest>(), It.IsAny<int>()))
             .Returns(
-                Source.Single(new ResourceEvent<IStreamDefinition>(WatchEventType.Added,
-                    StreamDefinitionTestCases.StreamDefinition)));
+                Source.Single(new ResourceEvent<IStreamDefinition>(EventType: WatchEventType.Added,
+                    kubernetesObject: StreamDefinitionTestCases.StreamDefinition)));
 
         streamingJobOperatorServiceMock
             .Setup(service => service.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(FailedJob.AsOption());
 
-        this.kubeClusterMock
+        kubeClusterMock
             .Setup(service
                 => service.UpdateCustomResourceStatus(
                     It.IsAny<string>(),
@@ -380,13 +384,13 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
                     It.IsAny<string>(),
                     It.IsAny<It.IsAnyType>(),
                     It.IsAny<Func<JsonElement, It.IsAnyType>>()
-                    ))
+                ))
             .ThrowsAsync(new Exception());
 
-        var task = this.tcs.Task;
+        var task = tcs.Task;
 
         // Act
-        var sp = this.CreateServiceProvider();
+        var sp = CreateServiceProvider();
         sp.GetRequiredService<IStreamOperatorService>().Attach(StreamClass);
         await task;
 
@@ -397,9 +401,9 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
 
     private void SetupEventMock(WatchEventType eventType, IStreamDefinition streamDefinition)
     {
-        this.streamDefinitionRepositoryMock
+        streamDefinitionRepositoryMock
             .Setup(service => service.GetEvents(It.IsAny<CustomResourceApiRequest>(), It.IsAny<int>()))
-            .Returns(Source.Single(new ResourceEvent<IStreamDefinition>(eventType, streamDefinition)));
+            .Returns(Source.Single(new ResourceEvent<IStreamDefinition>(EventType: eventType, kubernetesObject: streamDefinition)));
     }
 
 
@@ -414,43 +418,36 @@ public class StreamOperatorServiceTests : IClassFixture<LoggerFixture>, IDisposa
             MetricsPublisherActorConfiguration = new MetricsPublisherActorConfiguration
             {
                 InitialDelay = TimeSpan.FromSeconds(30),
-                UpdateInterval = TimeSpan.FromSeconds(10)
-            }
+                UpdateInterval = TimeSpan.FromSeconds(10),
+            },
         });
         return new ServiceCollection()
-            .AddSingleton(this.materializer)
-            .AddSingleton(this.actorSystem)
-            .AddSingleton(this.kubeClusterMock.Object)
-            .AddSingleton<IMaterializer>(this.actorSystem.Materializer())
+            .AddSingleton(materializer)
+            .AddSingleton(actorSystem)
+            .AddSingleton(kubeClusterMock.Object)
+            .AddSingleton<IMaterializer>(actorSystem.Materializer())
             .AddSingleton(streamingJobOperatorServiceMock.Object)
-            .AddSingleton(this.streamDefinitionRepositoryMock.Object)
-            .AddSingleton(this.streamingJobTemplateRepositoryMock.Object)
+            .AddSingleton(streamDefinitionRepositoryMock.Object)
+            .AddSingleton(streamingJobTemplateRepositoryMock.Object)
             .AddSingleton<ICommandHandler<UpdateStatusCommand>, UpdateStatusCommandHandler>()
             .AddSingleton<ICommandHandler<SetAnnotationCommand<V1Job>>, AnnotationCommandHandler>()
             .AddSingleton<ICommandHandler<RemoveAnnotationCommand<IStreamDefinition>>, AnnotationCommandHandler>()
             .AddSingleton<ICommandHandler<StreamingJobCommand>, StreamingJobCommandHandler>()
-            .AddSingleton(this.streamClassRepositoryMock.Object)
+            .AddSingleton(streamClassRepositoryMock.Object)
             .AddSingleton<IMetricsReporter, MetricsReporter>()
             .AddSingleton(Mock.Of<MetricsService>())
             .AddSingleton(metricsReporterConfiguration)
             .AddSingleton<IEventFilter<IStreamDefinition>, EmptyEventFilter<IStreamDefinition>>()
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<StreamOperatorService>())
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<StreamDefinitionRepository>())
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<StreamingJobOperatorService>())
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<StreamingJobRepository>())
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<AnnotationCommandHandler>())
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<UpdateStatusCommandHandler>())
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<StreamingJobCommandHandler>())
-            .AddSingleton(this.streamingJobOperatorServiceMock.Object)
+            .AddSingleton(loggerFixture.Factory.CreateLogger<StreamOperatorService>())
+            .AddSingleton(loggerFixture.Factory.CreateLogger<StreamDefinitionRepository>())
+            .AddSingleton(loggerFixture.Factory.CreateLogger<StreamingJobOperatorService>())
+            .AddSingleton(loggerFixture.Factory.CreateLogger<StreamingJobRepository>())
+            .AddSingleton(loggerFixture.Factory.CreateLogger<AnnotationCommandHandler>())
+            .AddSingleton(loggerFixture.Factory.CreateLogger<UpdateStatusCommandHandler>())
+            .AddSingleton(loggerFixture.Factory.CreateLogger<StreamingJobCommandHandler>())
+            .AddSingleton(streamingJobOperatorServiceMock.Object)
             .AddSingleton(optionsMock.Object)
             .AddSingleton<IStreamOperatorService, StreamOperatorService>()
             .BuildServiceProvider();
-    }
-
-    public void Dispose()
-    {
-        this.actorSystem?.Dispose();
-        this.materializer?.Dispose();
-        this.cts?.Dispose();
     }
 }

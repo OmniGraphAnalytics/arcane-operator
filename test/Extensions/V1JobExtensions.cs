@@ -5,6 +5,8 @@ namespace Arcane.Operator.Tests.Extensions;
 
 public static class V1JobExtensions
 {
-    public static bool IsBackfilling(this V1Job job) =>
-        job.Spec.Template.Spec.Containers[0].Env.Any(i => i.Name == "STREAMCONTEXT__BACKFILL" && i.Value == "true");
+    public static bool IsBackfilling(this V1Job job)
+    {
+        return job.Spec.Template.Spec.Containers[0].Env.Any(i => i.Name == "STREAMCONTEXT__BACKFILL" && i.Value == "true");
+    }
 }

@@ -1,7 +1,4 @@
-﻿using System;
-using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Net;
 using Akka;
 using Akka.Util;
 using Arcane.Operator.Extensions;
@@ -13,63 +10,53 @@ using Arcane.Operator.Models.StreamDefinitions.Base;
 using Arcane.Operator.Services.Base;
 using Arcane.Operator.Services.Base.CommandHandlers;
 using Arcane.Operator.Services.Base.Repositories.CustomResources;
-using Google.Protobuf.WellKnownTypes;
 using k8s.Autorest;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
-using Snd.Sdk.Kubernetes;
-using Snd.Sdk.Kubernetes.Base;
-using Snd.Sdk.Tasks;
+using OmniModels.Extensions;
+using OmniModels.Services.Base;
+using OmniModels.Services.Kubernetes;
 
 namespace Arcane.Operator.Services.CommandHandlers;
 
 /// <inheritdoc cref="ICommandHandler{T}" />
-public class StreamingJobCommandHandler : ICommandHandler<StreamingJobCommand>
+public class StreamingJobCommandHandler(
+    IStreamClassRepository streamClassRepository,
+    IKubeCluster kubeCluster,
+    ILogger<StreamingJobCommandHandler> logger,
+    ICommandHandler<UpdateStatusCommand> updateStatusCommandHandler,
+    IStreamingJobTemplateRepository streamingJobTemplateRepository)
+    : ICommandHandler<StreamingJobCommand>
 {
-    private readonly IStreamClassRepository streamClassRepository;
-    private readonly IKubeCluster kubeCluster;
-    private readonly ILogger<StreamingJobCommandHandler> logger;
-    private readonly IStreamingJobTemplateRepository streamingJobTemplateRepository;
-    private readonly ICommandHandler<UpdateStatusCommand> updateStatusCommandHandler;
-
-    public StreamingJobCommandHandler(
-        IStreamClassRepository streamClassRepository,
-        IKubeCluster kubeCluster,
-        ILogger<StreamingJobCommandHandler> logger,
-        ICommandHandler<UpdateStatusCommand> updateStatusCommandHandler,
-        IStreamingJobTemplateRepository streamingJobTemplateRepository)
-    {
-        this.streamClassRepository = streamClassRepository;
-        this.kubeCluster = kubeCluster;
-        this.logger = logger;
-        this.streamingJobTemplateRepository = streamingJobTemplateRepository;
-        this.updateStatusCommandHandler = updateStatusCommandHandler;
-    }
-
     /// <inheritdoc cref="ICommandHandler{T}.Handle" />
-    public Task Handle(StreamingJobCommand command) => command switch
+    public Task Handle(StreamingJobCommand command)
     {
-        StartJob startJob => this.streamClassRepository
-            .Get(startJob.streamDefinition.Namespace(), startJob.streamDefinition.Kind)
-            .TryMap(maybeSc => maybeSc switch
-            {
-                { HasValue: true, Value: var sc } => this.StartJob(startJob.streamDefinition, startJob.IsBackfilling, sc),
-                { HasValue: false } => throw new InvalidOperationException($"Stream class not found for {startJob.streamDefinition.Kind}"),
-            }),
-        StopJob stopJob => this.kubeCluster.DeleteJob(stopJob.name, stopJob.nameSpace),
-        _ => throw new ArgumentOutOfRangeException(nameof(command), command, null)
-    };
+        return command switch
+        {
+            StartJob startJob => streamClassRepository
+                .Get(nameSpace: startJob.streamDefinition.Namespace(), streamDefinitionKind: startJob.streamDefinition.Kind)
+                .TryMap(maybeSc => maybeSc switch
+                {
+                    { HasValue: true, Value: var sc } => StartJob(streamDefinition: startJob.streamDefinition, isBackfilling: startJob.IsBackfilling,
+                        streamClass: sc),
+                    { HasValue: false } => throw new InvalidOperationException($"Stream class not found for {startJob.streamDefinition.Kind}"),
+                }),
+            StopJob stopJob => kubeCluster.DeleteJob(jobId: stopJob.name, jobNamespace: stopJob.nameSpace),
+            _ => throw new ArgumentOutOfRangeException(paramName: nameof(command), actualValue: command, message: null),
+        };
+    }
 
     private Task StartJob(IStreamDefinition streamDefinition, bool isBackfilling, IStreamClass streamClass)
     {
         var template = streamDefinition.GetJobTemplate(isBackfilling);
 
-        return this.streamingJobTemplateRepository
-            .GetStreamingJobTemplate(template.Kind, streamDefinition.Namespace(), template.Name)
-            .FlatMap(t => this.TryStartJobFromTemplate(t, streamDefinition, streamClass, isBackfilling, template))
+        return streamingJobTemplateRepository
+            .GetStreamingJobTemplate(kind: template.Kind, jobNamespace: streamDefinition.Namespace(), templateName: template.Name)
+            .FlatMap(t => TryStartJobFromTemplate(jobTemplate: t, streamDefinition: streamDefinition, streamClass: streamClass,
+                isBackfilling: isBackfilling, reference: template))
             .FlatMap(async command =>
             {
-                await this.updateStatusCommandHandler.Handle(command);
+                await updateStatusCommandHandler.Handle(command);
                 return NotUsed.Instance;
             });
     }
@@ -84,25 +71,25 @@ public class StreamingJobCommandHandler : ICommandHandler<StreamingJobCommand>
         {
             var message = $"Failed to find job template with kind {reference.Kind} and name {reference.Name}";
             var condition = V1Alpha1StreamCondition.CustomErrorCondition(message);
-            var command = new SetInternalErrorStatus(streamDefinition, condition);
+            var command = new SetInternalErrorStatus(affectedResource: streamDefinition, conditions: condition);
             return Task.FromResult<UpdateStatusCommand>(command);
         }
 
 
         try
         {
-            var job = this.BuildJob(jobTemplate, streamDefinition, streamClass, isBackfilling);
-            this.logger.LogInformation("Starting a new stream job with an id {streamId}", streamDefinition.StreamId);
-            return this.kubeCluster
-                .SendJob(job, streamDefinition.Metadata.Namespace(), CancellationToken.None)
+            var job = BuildJob(jobTemplate: jobTemplate, streamDefinition: streamDefinition, streamClass: streamClass, isBackfilling: isBackfilling);
+            logger.LogInformation(message: "Starting a new stream job with an id {streamId}", streamDefinition.StreamId);
+            return kubeCluster
+                .SendJob(job: job, jobNamespace: streamDefinition.Metadata.Namespace(), cancellationToken: CancellationToken.None)
                 .TryMap(
-                    _ => isBackfilling ? new Reloading(streamDefinition) : new Running(streamDefinition),
-                    ex => this.HandleError(ex, streamDefinition, isBackfilling));
+                    selector: _ => isBackfilling ? new Reloading(streamDefinition) : new Running(streamDefinition),
+                    errorHandler: ex => HandleError(exception: ex, streamDefinition: streamDefinition, isBackfilling: isBackfilling));
         }
         catch (Exception ex)
         {
             var condition = V1Alpha1StreamCondition.CustomErrorCondition($"Failed to build job: {ex.Message}");
-            return Task.FromResult<UpdateStatusCommand>(new SetInternalErrorStatus(streamDefinition, condition));
+            return Task.FromResult<UpdateStatusCommand>(new SetInternalErrorStatus(affectedResource: streamDefinition, conditions: condition));
         }
     }
 
@@ -110,24 +97,27 @@ public class StreamingJobCommandHandler : ICommandHandler<StreamingJobCommand>
     {
         if (exception is HttpOperationException { Response.StatusCode: HttpStatusCode.Conflict })
         {
-            this.logger.LogWarning(exception, "Streaming job with ID {streamId} already exists", streamDefinition.StreamId);
+            logger.LogWarning(exception: exception, message: "Streaming job with ID {streamId} already exists", streamDefinition.StreamId);
             return isBackfilling ? new Reloading(streamDefinition) : new Running(streamDefinition);
         }
-        this.logger.LogError(exception, "Failed to send job");
+
+        logger.LogError(exception: exception, message: "Failed to send job");
         var condition = V1Alpha1StreamCondition.CustomErrorCondition($"Failed to start job: {exception.Message}");
-        return new SetInternalErrorStatus(streamDefinition, condition);
+        return new SetInternalErrorStatus(affectedResource: streamDefinition, conditions: condition);
     }
 
     private V1Job BuildJob(Option<IStreamingJobTemplate> jobTemplate, IStreamDefinition streamDefinition,
-        IStreamClass streamClass, bool isBackfilling) =>
-        jobTemplate
+        IStreamClass streamClass, bool isBackfilling)
+    {
+        return jobTemplate
             .Value
             .GetJob()
-            .WithStreamingJobLabels(streamDefinition.StreamId, isBackfilling, streamDefinition.Kind)
+            .WithStreamingJobLabels(streamId: streamDefinition.StreamId, isBackfilling: isBackfilling, streamKind: streamDefinition.Kind)
             .WithStreamingJobAnnotations(streamDefinition.GetConfigurationChecksum())
             .WithMetadataAnnotations(streamClass)
             .WithCustomEnvironment(streamDefinition.ToV1EnvFromSources(streamClass))
-            .WithCustomEnvironment(streamDefinition.ToEnvironment(isBackfilling, streamClass))
-            .WithOwnerReference(streamDefinition)
+            .WithCustomEnvironment(streamDefinition.ToEnvironment(isBackfilling: isBackfilling, streamClass: streamClass))
+            .WithOwnerReference(apiVersion: streamDefinition.ApiVersion, kind: streamDefinition.Kind, metadata: streamDefinition.Metadata)
             .WithName(streamDefinition.StreamId);
+    }
 }

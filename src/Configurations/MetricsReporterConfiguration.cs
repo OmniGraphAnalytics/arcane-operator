@@ -9,5 +9,5 @@ namespace Arcane.Operator.Configurations;
 [ExcludeFromCodeCoverage(Justification = "Model")]
 public class MetricsReporterConfiguration
 {
-    public MetricsPublisherActorConfiguration MetricsPublisherActorConfiguration { get; set; }
+    public MetricsPublisherActorConfiguration MetricsPublisherActorConfiguration { get; set; } = new();
 };

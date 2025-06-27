@@ -1,0 +1,39 @@
+# editorconfig file https://editorconfig.org
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+
+[*.sql]
+indent_style = space
+indent_size = 2
+
+
+[*.cs]
+indent_style = space
+indent_size = 4
+max_line_length = 150
+resharper_csharp_place_record_field_attribute_on_same_line = never
+resharper_csharp_place_attribute_on_same_line = never
+resharper_csharp_naming_rule.private_instance_fields = aaBb
+resharper_csharp_naming_rule.enum_member = AA_BB
+resharper_class_never_instantiated_global_highlighting = none
+resharper_unused_member_global_highlighting = none
+resharper_member_can_be_private_global_highlighting = none
+resharper_member_can_be_protected_global_highlighting = none
+resharper_member_never_updated_global_highlighting = none
+resharper_member_never_read_global_highlighting = none
+resharper_unused_type_global_highlighting = none
+resharper_property_can_be_made_init_only_global_highlighting = none
+resharper_unused_member_in_super_global_highlighting = none
+resharper_unused_auto_property_accessor_global_highlighting = none
+resharper_parameter_only_used_for_precondition_check_global_highlighting = none
+resharper_parameter_only_used_for_precondition_check_local_highlighting = none
+resharper_redundant_argument_default_value_highlighting = none
+resharper_auto_property_can_be_made_get_only_global_highlighting = none
+resharper_csharp_arguments_skip_single = true
+resharper_csharp_arguments_named = named
+resharper_csharp_arguments_literal = named
+resharper_csharp_arguments_string_literal = named

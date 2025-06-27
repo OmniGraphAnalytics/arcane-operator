@@ -20,8 +20,10 @@ public static class JsonElementExtensions
     /// <param name="jsonElement">Element to deserialize</param>
     /// <returns></returns>
     [ExcludeFromCodeCoverage(Justification = "Trivial")]
-    public static Option<IStreamDefinition> AsOptionalStreamDefinition(this JsonElement jsonElement) =>
-        jsonElement.Deserialize<StreamDefinition>().AsOption<IStreamDefinition>();
+    public static Option<IStreamDefinition> AsOptionalStreamDefinition(this JsonElement jsonElement)
+    {
+        return jsonElement.Deserialize<StreamDefinition>()?.AsOption<IStreamDefinition>() ?? Option<IStreamDefinition>.None;
+    }
 
     /// <summary>
     /// Deserialize the JsonElement to IStreamDefinition object and wrap it in an Option{IStreamDefinition} object
@@ -29,6 +31,8 @@ public static class JsonElementExtensions
     /// <param name="jsonElement">Element to deserialize</param>
     /// <returns></returns>
     [ExcludeFromCodeCoverage(Justification = "Trivial")]
-    public static Option<IStreamClass> AsOptionalStreamClass(this JsonElement jsonElement) =>
-        jsonElement.Deserialize<V1Beta1StreamClass>().AsOption<IStreamClass>();
+    public static Option<IStreamClass> AsOptionalStreamClass(this JsonElement jsonElement)
+    {
+        return jsonElement.Deserialize<V1Beta1StreamClass>()?.AsOption<IStreamClass>() ?? Option<IStreamClass>.None;
+    }
 }
