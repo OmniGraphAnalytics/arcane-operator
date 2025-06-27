@@ -18,55 +18,63 @@ public class FailedStreamDefinition : IStreamDefinition
         this.exception = exception;
     }
 
+    public V1TypedLocalObjectReference JobTemplateRef => throw exception;
+    public V1TypedLocalObjectReference ReloadingJobTemplateRef => throw exception;
+
     public string ApiVersion
     {
-        get => throw this.exception;
-        set => throw this.exception;
+        get => throw exception;
+        set => throw exception;
     }
 
     public string Kind
     {
-        get => throw this.exception;
-        set => throw this.exception;
+        get => throw exception;
+        set => throw exception;
     }
 
     public V1ObjectMeta Metadata
     {
-        get => throw this.exception;
-        set => throw this.exception;
+        get => throw exception;
+        set => throw exception;
     }
 
-    public string StreamId => throw this.exception;
-    public bool Suspended => throw this.exception;
-    public bool ReloadRequested => throw this.exception;
-    public V1TypedLocalObjectReference JobTemplateRef => throw this.exception;
-    public V1TypedLocalObjectReference ReloadingJobTemplateRef => throw this.exception;
-    public IEnumerable<V1EnvFromSource> ToV1EnvFromSources(IStreamClass streamDefinition) => throw this.exception;
+    public string StreamId => throw exception;
+    public bool Suspended => throw exception;
+    public bool ReloadRequested => throw exception;
 
-    public Dictionary<string, string> ToEnvironment(bool isBackfilling, IStreamClass streamDefinition) => throw this.exception;
-
-    public IEnumerable<V1EnvFromSource> ToV1EnvFromSources()
+    public IEnumerable<V1EnvFromSource> ToV1EnvFromSources(IStreamClass streamDefinition)
     {
-        throw this.exception;
+        throw exception;
     }
 
-    public Dictionary<string, string> ToEnvironment(bool isBackfilling)
+    public Dictionary<string, string> ToEnvironment(bool isBackfilling, IStreamClass streamDefinition)
     {
-        throw this.exception;
+        throw exception;
     }
 
     public string GetConfigurationChecksum()
     {
-        throw this.exception;
+        throw exception;
     }
 
     public V1TypedLocalObjectReference GetJobTemplate(bool isBackfilling)
     {
-        throw this.exception;
+        throw exception;
     }
 
     public void Deconstruct(out string nameSpace, out string kind, out string streamId)
     {
-        throw this.exception;
+        throw exception;
+    }
+
+    public IEnumerable<V1EnvFromSource> ToV1EnvFromSources()
+    {
+        throw exception;
+    }
+
+    public Dictionary<string, string> ToEnvironment(bool isBackfilling)
+    {
+        throw exception;
     }
 }

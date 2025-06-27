@@ -20,35 +20,37 @@ public class StreamDefinitionRepository(IKubeCluster kubeCluster) : IReactiveRes
         int maxBufferCapacity)
     {
         var listTask = kubeCluster.ListCustomResources<StreamDefinition>(
-            request.ApiGroup,
-            request.ApiVersion,
-            request.PluralName,
-            request.Namespace);
+            group: request.ApiGroup,
+            version: request.ApiVersion,
+            plural: request.PluralName,
+            crdNamespace: request.Namespace);
 
         var initialSync = Source
             .FromTask(listTask)
             .SelectMany(sd => sd)
-            .Select(sd => new ResourceEvent<IStreamDefinition>(WatchEventType.Modified, sd));
+            .Select(sd => new ResourceEvent<IStreamDefinition>(EventType: WatchEventType.Modified, kubernetesObject: sd));
 
 
         var subscriptionSource = kubeCluster.StreamCustomResourceEvents<StreamDefinition>(
-                request.Namespace,
-                request.ApiGroup,
-                request.ApiVersion,
-                request.PluralName,
-                maxBufferCapacity,
-                OverflowStrategy.Fail)
-            .Select(tuple => new ResourceEvent<IStreamDefinition>(tuple.Item1, tuple.Item2));
+                crdNamespace: request.Namespace,
+                group: request.ApiGroup,
+                version: request.ApiVersion,
+                plural: request.PluralName,
+                maxBufferCapacity: maxBufferCapacity,
+                overflowStrategy: OverflowStrategy.Fail)
+            .Select(tuple => new ResourceEvent<IStreamDefinition>(EventType: tuple.Item1, kubernetesObject: tuple.Item2));
 
         return initialSync.Concat(subscriptionSource);
     }
 
     /// <inheritdoc cref="IResourceCollection{TResourceType}.Get"/>
-    public Task<Option<IStreamDefinition>> Get(string name, CustomResourceApiRequest request) =>
-        kubeCluster.GetCustomResource(request.ApiGroup,
-            request.ApiVersion,
-            request.PluralName,
-            request.Namespace,
-            name,
-            element => element.AsOptionalStreamDefinition());
+    public Task<Option<IStreamDefinition>> Get(string name, CustomResourceApiRequest request)
+    {
+        return kubeCluster.GetCustomResource(group: request.ApiGroup,
+            version: request.ApiVersion,
+            plural: request.PluralName,
+            crdNamespace: request.Namespace,
+            name: name,
+            converter: element => element.AsOptionalStreamDefinition());
+    }
 }

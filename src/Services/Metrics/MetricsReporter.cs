@@ -24,10 +24,10 @@ public class MetricsReporter : IMetricsReporter
         IOptions<MetricsReporterConfiguration> metricsReporterConfiguration)
     {
         this.metricsService = metricsService;
-        this.statusActor = actorSystem.ActorOf(props: Props.Create(() => new MetricsPublisherActor(
+        statusActor = actorSystem.ActorOf(props: Props.Create(() => new MetricsPublisherActor(
                 metricsReporterConfiguration.Value.MetricsPublisherActorConfiguration,
                 metricsService)),
-            nameof(MetricsPublisherActor));
+            name: nameof(MetricsPublisherActor));
     }
 
     /// <inheritdoc cref="IMetricsReporter.ReportStatusMetrics"/>
@@ -35,27 +35,29 @@ public class MetricsReporter : IMetricsReporter
     {
         if (command.phase.IsFinal())
         {
-            this.statusActor.Tell(new RemoveStreamClassMetricsMessage(command.streamClass.KindRef));
+            statusActor.Tell(new RemoveStreamClassMetricsMessage(command.streamClass.KindRef));
         }
         else
         {
-            var msg = new AddStreamClassMetricsMessage(command.streamClass.KindRef, "stream_class", command.GetMetricsTags());
-            this.statusActor.Tell(msg);
+            var msg = new AddStreamClassMetricsMessage(StreamKindRef: command.streamClass.KindRef, MetricName: "stream_class",
+                MetricTags: command.GetMetricsTags());
+            statusActor.Tell(msg);
         }
+
         return command;
     }
 
     /// <inheritdoc cref="IMetricsReporter.ReportTrafficMetrics"/>
     public (WatchEventType, V1Job) ReportTrafficMetrics((WatchEventType, V1Job) jobEvent)
     {
-        this.metricsService.Count(jobEvent.Item1.TrafficMetricName(), 1, jobEvent.Item2.GetMetricsTags());
+        metricsService.Count(metricName: jobEvent.Item1.TrafficMetricName(), metricValue: 1, tags: jobEvent.Item2.GetMetricsTags());
         return jobEvent;
     }
 
     /// <inheritdoc cref="IMetricsReporter.ReportTrafficMetrics"/>
     public ResourceEvent<TResource> ReportTrafficMetrics<TResource>(ResourceEvent<TResource> ev) where TResource : IKubernetesObject<V1ObjectMeta>
     {
-        this.metricsService.Count(ev.EventType.TrafficMetricName(), 1, ev.kubernetesObject.GetMetricsTags());
+        metricsService.Count(metricName: ev.EventType.TrafficMetricName(), metricValue: 1, tags: ev.kubernetesObject.GetMetricsTags());
         return ev;
     }
 }

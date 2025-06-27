@@ -23,7 +23,7 @@ public class Program
         }
         catch (Exception ex)
         {
-            Log.Fatal(ex, "Host terminated unexpectedly");
+            Log.Fatal(exception: ex, messageTemplate: "Host terminated unexpectedly");
             return 1;
         }
         finally
@@ -35,8 +35,8 @@ public class Program
     public static IHostBuilder CreateHostBuilder(string[] args)
     {
         return Host.CreateDefaultBuilder(args)
-            .AddSerilogLogger(AppDomain.CurrentDomain.FriendlyName,
-                (context, provider, loggerConfiguration) => loggerConfiguration
+            .AddSerilogLogger(applicationName: AppDomain.CurrentDomain.FriendlyName,
+                configureLogger: (context, provider, loggerConfiguration) => loggerConfiguration
                     .Default()
                     .AddDatadog()
                     .EnrichFromConfiguration(context.Configuration)

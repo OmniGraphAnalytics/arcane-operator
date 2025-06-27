@@ -1,6 +1,4 @@
-﻿using System.Threading;
-using System.Threading.Tasks;
-using Akka.Streams;
+﻿using Akka.Streams;
 using Arcane.Operator.Services.Base;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -25,19 +23,19 @@ public class HostedStreamingJobOperatorService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        this.logger.LogInformation("Activated {service}", nameof(HostedStreamingJobOperatorService));
+        logger.LogInformation(message: "Activated {service}", nameof(HostedStreamingJobOperatorService));
         while (!stoppingToken.IsCancellationRequested)
         {
-            this.logger.LogInformation("Activated JobEventGraph");
-            await this.streamingJobOperatorService
+            logger.LogInformation("Activated JobEventGraph");
+            await streamingJobOperatorService
                 .GetJobEventsGraph(stoppingToken)
-                .Run(this.materializer);
+                .Run(materializer);
         }
     }
 
     public override Task StopAsync(CancellationToken cancellationToken)
     {
-        this.logger.LogInformation("Stopping {service}", nameof(HostedStreamingJobOperatorService));
+        logger.LogInformation(message: "Stopping {service}", nameof(HostedStreamingJobOperatorService));
         return base.StopAsync(cancellationToken);
     }
 }

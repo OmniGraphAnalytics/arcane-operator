@@ -15,5 +15,4 @@ public static class Annotations
     public const string ARCANE_STREAM_API_GROUP = "stream.arcane.sneaksanddata.com/api-group";
     public const string ARCANE_STREAM_API_VERSION = "stream.arcane.sneaksanddata.com/api-version";
     public const string ARCANE_STREAM_API_PLURAL_NAME = "stream.arcane.sneaksanddata.com/api-plural-name";
-
 }

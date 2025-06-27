@@ -28,14 +28,14 @@ public record StopJob(string name, string nameSpace) : StreamingJobCommand;
 /// Request a streaming job to restart
 /// </summary>
 /// <param name="affectedResource">Job object</param>
-public record RequestJobRestartCommand(V1Job affectedResource) : SetAnnotationCommand<V1Job>(affectedResource,
-    Annotations.STATE_ANNOTATION_KEY,
-    Annotations.RESTARTING_STATE_ANNOTATION_VALUE);
+public record RequestJobRestartCommand(V1Job affectedResource) : SetAnnotationCommand<V1Job>(affectedResource: affectedResource,
+    annotationKey: Annotations.STATE_ANNOTATION_KEY,
+    annotationValue: Annotations.RESTARTING_STATE_ANNOTATION_VALUE);
 
 /// <summary>
 /// Request a streaming job to restart in backfill mode
 /// </summary>
 /// <param name="affectedResource">Job object</param>
-public record RequestJobReloadCommand(V1Job affectedResource) : SetAnnotationCommand<V1Job>(affectedResource,
-    Annotations.STATE_ANNOTATION_KEY,
-    Annotations.RELOADING_STATE_ANNOTATION_VALUE);
+public record RequestJobReloadCommand(V1Job affectedResource) : SetAnnotationCommand<V1Job>(affectedResource: affectedResource,
+    annotationKey: Annotations.STATE_ANNOTATION_KEY,
+    annotationValue: Annotations.RELOADING_STATE_ANNOTATION_VALUE);

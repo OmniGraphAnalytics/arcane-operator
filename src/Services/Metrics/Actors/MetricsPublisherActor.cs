@@ -12,9 +12,10 @@ namespace Arcane.Operator.Services.Metrics.Actors;
 /// <param name="MetricName">Name of the stream kind referenced by the stream class</param>
 /// <param name="MetricTags">Name of the metric to report</param>
 /// <param name="MetricTags">Tags of the metric to report</param>
-public record AddStreamClassMetricsMessage(string StreamKindRef, string MetricName,
+public record AddStreamClassMetricsMessage(
+    string StreamKindRef,
+    string MetricName,
     SortedDictionary<string, string> MetricTags);
-
 
 /// <summary>
 /// Remove stream class metrics message. Once received, the metrics will be removed from the
@@ -22,7 +23,6 @@ public record AddStreamClassMetricsMessage(string StreamKindRef, string MetricNa
 /// </summary>
 /// <param name="StreamKindRef">Name of the stream kind referenced by the stream class</param>
 public record RemoveStreamClassMetricsMessage(string StreamKindRef);
-
 
 /// <summary>
 /// Emit metrics message. Once received, the metrics will be emitted to the metrics service.
@@ -52,54 +52,54 @@ public class StreamClassMetric
     public int MetricValue { get; set; } = 1;
 }
 
-
 /// <summary>
 /// Stream class service actor. This actor is responsible for collecting metrics for stream classes
 /// that should be emitted periodically.
 /// </summary>
 public class MetricsPublisherActor : ReceiveActor, IWithTimers
 {
-    public ITimerScheduler Timers { get; set; } = null!;
-    private readonly Dictionary<string, StreamClassMetric> streamClassMetrics = new();
-    private readonly ILoggingAdapter log = Context.GetLogger();
     private readonly MetricsPublisherActorConfiguration configuration;
+    private readonly ILoggingAdapter log = Context.GetLogger();
+    private readonly Dictionary<string, StreamClassMetric> streamClassMetrics = new();
 
     public MetricsPublisherActor(MetricsPublisherActorConfiguration configuration, MetricsService metricsService)
     {
         this.configuration = configuration;
-        this.Receive<AddStreamClassMetricsMessage>(s =>
+        Receive<AddStreamClassMetricsMessage>(s =>
         {
-            this.log.Debug("Adding stream class metrics for {streamKindRef}", s.StreamKindRef);
-            this.streamClassMetrics[s.StreamKindRef] = new StreamClassMetric
+            log.Debug(format: "Adding stream class metrics for {streamKindRef}", arg1: s.StreamKindRef);
+            streamClassMetrics[s.StreamKindRef] = new StreamClassMetric
             {
                 MetricTags = s.MetricTags,
                 MetricName = s.MetricName,
             };
         });
 
-        this.Receive<RemoveStreamClassMetricsMessage>(s =>
+        Receive<RemoveStreamClassMetricsMessage>(s =>
         {
-            if (!this.streamClassMetrics.Remove(s.StreamKindRef))
+            if (!streamClassMetrics.Remove(s.StreamKindRef))
             {
-                this.log.Warning("Stream class {streamKindRef} not found in metrics collection", s.StreamKindRef);
+                log.Warning(format: "Stream class {streamKindRef} not found in metrics collection", arg1: s.StreamKindRef);
             }
         });
 
-        this.Receive<EmitMetricsMessage>(_ =>
+        Receive<EmitMetricsMessage>(_ =>
         {
-            this.log.Debug("Start emitting stream class metrics");
-            foreach (var (_, metric) in this.streamClassMetrics)
+            log.Debug("Start emitting stream class metrics");
+            foreach (var (_, metric) in streamClassMetrics)
             {
-                metricsService.Count(metric.MetricName, metric.MetricValue, metric.MetricTags);
+                metricsService.Count(metricName: metric.MetricName, metricValue: metric.MetricValue, tags: metric.MetricTags);
             }
         });
     }
 
+    public ITimerScheduler Timers { get; set; } = null!;
+
     protected override void PreStart()
     {
-        this.Timers.StartPeriodicTimer(nameof(EmitMetricsMessage),
-            new EmitMetricsMessage(),
-            this.configuration.InitialDelay,
-            this.configuration.UpdateInterval);
+        Timers.StartPeriodicTimer(key: nameof(EmitMetricsMessage),
+            msg: new EmitMetricsMessage(),
+            initialDelay: configuration.InitialDelay,
+            interval: configuration.UpdateInterval);
     }
 }

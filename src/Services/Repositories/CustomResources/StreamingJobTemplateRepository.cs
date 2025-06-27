@@ -26,23 +26,23 @@ public class StreamingJobTemplateRepository(
 
         if (jobTemplateResourceConfiguration is { ApiGroup: not null, Version: not null, Plural: not null })
         {
-            logger.LogError("Failed to get job template configuration for kind {kind}", kind);
+            logger.LogError(message: "Failed to get job template configuration for kind {kind}", kind);
             return Task.FromResult(Option<IStreamingJobTemplate>.None);
         }
 
         return kubeCluster
             .GetCustomResource<V1Beta1StreamingJobTemplate>(
-                jobTemplateResourceConfiguration.ApiGroup,
-                jobTemplateResourceConfiguration.Version,
-                jobTemplateResourceConfiguration.Plural,
-                jobNamespace,
-                templateName)
-            .TryMap(resource => resource.AsOption<IStreamingJobTemplate>(),
-                _ =>
-            {
-                logger.LogError("Failed to get job template {templateName} for kind {kind} in namespace {jobNamespace}",
-                    templateName, kind, jobNamespace);
-                return Option<IStreamingJobTemplate>.None;
-            });
+                group: jobTemplateResourceConfiguration.ApiGroup,
+                version: jobTemplateResourceConfiguration.Version,
+                plural: jobTemplateResourceConfiguration.Plural,
+                crdNamespace: jobNamespace,
+                name: templateName)
+            .TryMap(selector: resource => resource.AsOption<IStreamingJobTemplate>(),
+                errorHandler: _ =>
+                {
+                    logger.LogError(message: "Failed to get job template {templateName} for kind {kind} in namespace {jobNamespace}",
+                        templateName, kind, jobNamespace);
+                    return Option<IStreamingJobTemplate>.None;
+                });
     }
 }

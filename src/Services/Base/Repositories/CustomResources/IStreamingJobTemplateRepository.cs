@@ -1,5 +1,4 @@
-﻿using System.Threading.Tasks;
-using Akka.Util;
+﻿using Akka.Util;
 using Arcane.Operator.Models.Resources.JobTemplates.Base;
 
 namespace Arcane.Operator.Services.Base;

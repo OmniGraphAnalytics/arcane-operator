@@ -1,10 +1,7 @@
 ﻿using Arcane.Operator.Models.Api;
 using Arcane.Operator.Models.Base;
-using Arcane.Operator.Models.Resources;
 using Arcane.Operator.Models.Resources.Status.V1Alpha1;
 using Arcane.Operator.Models.Resources.StreamClass.Base;
-using Arcane.Operator.Services.Base;
-using Arcane.Operator.Services.Base.CommandHandlers;
 
 namespace Arcane.Operator.Models.Commands;
 
@@ -26,7 +23,7 @@ public enum StreamClassPhase
     /// <summary>
     /// The stream class is stopped and new Streams of this class can not be created.
     /// </summary>
-    STOPPED
+    STOPPED,
 }
 
 /// <summary>
@@ -37,9 +34,13 @@ public enum StreamClassPhase
 /// <param name="conditions">Resource conditions</param>
 /// <param name="phase">Resource phase</param>
 /// <param name="streamClass">Affected resource</param>
-public abstract record SetStreamClassStatusCommand(string resourceName,
-    CustomResourceApiRequest request, V1Alpha1StreamCondition[] conditions,
-    StreamClassPhase phase, IStreamClass streamClass) : SetResourceStatusCommand<V1Alpha1StreamCondition, StreamClassPhase>(request, conditions, phase);
+public abstract record SetStreamClassStatusCommand(
+    string resourceName,
+    CustomResourceApiRequest request,
+    V1Alpha1StreamCondition[] conditions,
+    StreamClassPhase phase,
+    IStreamClass streamClass)
+    : SetResourceStatusCommand<V1Alpha1StreamCondition, StreamClassPhase>(request: request, conditions: conditions, phase: phase);
 
 /// <summary>
 /// Update the stream class status command to Ready
@@ -48,7 +49,8 @@ public abstract record SetStreamClassStatusCommand(string resourceName,
 /// <param name="request">Resource metadata required for the Kubernetes Custom Resource APIs</param>
 /// <param name="streamClass">Affected resource</param>
 public record SetStreamClassReady(string resourceName, CustomResourceApiRequest request, IStreamClass streamClass)
-    : SetStreamClassStatusCommand(resourceName, request, V1Alpha1StreamCondition.ReadyCondition, StreamClassPhase.READY, streamClass);
+    : SetStreamClassStatusCommand(resourceName: resourceName, request: request, conditions: V1Alpha1StreamCondition.ReadyCondition,
+        phase: StreamClassPhase.READY, streamClass: streamClass);
 
 /// <summary>
 /// Update the stream class status command to Stopped
@@ -57,5 +59,5 @@ public record SetStreamClassReady(string resourceName, CustomResourceApiRequest 
 /// <param name="request">Resource metadata required for the Kubernetes Custom Resource APIs</param>
 /// <param name="streamClass">Affected resource</param>
 public record SetStreamClassStopped(string resourceName, CustomResourceApiRequest request, IStreamClass streamClass)
-    : SetStreamClassStatusCommand(resourceName, request, V1Alpha1StreamCondition.WarningCondition, StreamClassPhase.STOPPED, streamClass);
-
+    : SetStreamClassStatusCommand(resourceName: resourceName, request: request, conditions: V1Alpha1StreamCondition.WarningCondition,
+        phase: StreamClassPhase.STOPPED, streamClass: streamClass);

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Akka;
 using Akka.Streams.Dsl;
@@ -19,8 +18,8 @@ namespace Arcane.Operator.Services.EventFilters;
 [ExcludeFromCodeCoverage(Justification = "Requires integration testing")]
 public class ResourceVersionDuplicateFilter<TResourceType> : IEventFilter<TResourceType> where TResourceType : IKubernetesObject<V1ObjectMeta>
 {
-    private readonly IMemoryCache memoryCache;
     private readonly ILogger<ResourceVersionDuplicateFilter<TResourceType>> logger;
+    private readonly IMemoryCache memoryCache;
 
     public ResourceVersionDuplicateFilter(IMemoryCache memoryCache, ILogger<ResourceVersionDuplicateFilter<TResourceType>> logger)
     {
@@ -36,28 +35,31 @@ public class ResourceVersionDuplicateFilter<TResourceType> : IEventFilter<TResou
     {
         return Flow.FromFunction<ResourceEvent<TResourceType>, Option<ResourceEvent<TResourceType>>>(ev =>
         {
-            if (!memoryCache.TryGetValue<ResourceEvent<TResourceType>>(ToCacheKey(ev), out var cached))
+            if (!memoryCache.TryGetValue<ResourceEvent<TResourceType>>(key: ToCacheKey(ev), value: out var cached))
             {
-                memoryCache.Set(ToCacheKey(ev), ev);
+                memoryCache.Set(key: ToCacheKey(ev), value: ev);
                 return ev;
             }
 
             if (cached != null && cached.kubernetesObject.ResourceVersion() != ev.kubernetesObject.ResourceVersion())
             {
-                memoryCache.Set(ToCacheKey(ev), ev);
+                memoryCache.Set(key: ToCacheKey(ev), value: ev);
                 return ev;
             }
 
-            logger.LogInformation("Skip duplicate {type} event for  {objectKey}", ev.EventType, ToCacheKey(ev));
+            logger.LogInformation(message: "Skip duplicate {type} event for  {objectKey}", ev.EventType, ToCacheKey(ev));
             return Option<ResourceEvent<TResourceType>>.None;
         });
     }
 
 
-    private static string ToCacheKey(ResourceEvent<TResourceType> resourceEvent) => string.Join("/", new List<string>
+    private static string ToCacheKey(ResourceEvent<TResourceType> resourceEvent)
     {
-        resourceEvent?.kubernetesObject?.Kind,
-        resourceEvent?.kubernetesObject?.Namespace() ?? "",
-        resourceEvent?.kubernetesObject?.Name() ?? ""
-    });
+        return string.Join(separator: "/", values: new List<string>
+        {
+            resourceEvent?.kubernetesObject?.Kind,
+            resourceEvent?.kubernetesObject?.Namespace() ?? "",
+            resourceEvent?.kubernetesObject?.Name() ?? "",
+        });
+    }
 }

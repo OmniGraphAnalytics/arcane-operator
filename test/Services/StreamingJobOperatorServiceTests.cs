@@ -46,25 +46,25 @@ public class StreamingJobOperatorServiceTests : IClassFixture<LoggerFixture>
 {
     // Akka service and test helpers
     private readonly ActorSystem actorSystem = ActorSystem.Create(nameof(StreamingJobOperatorServiceTests));
-    private readonly LoggerFixture loggerFixture;
-    private readonly ActorMaterializer materializer;
 
     // Mocks
     private readonly Mock<IKubeCluster> kubeClusterMock = new();
-    private readonly Mock<IResourceCollection<IStreamDefinition>> streamDefinitionRepositoryMock = new();
+    private readonly LoggerFixture loggerFixture;
+    private readonly ActorMaterializer materializer;
     private readonly Mock<IStreamClassRepository> streamClassRepositoryMock = new();
+    private readonly Mock<IResourceCollection<IStreamDefinition>> streamDefinitionRepositoryMock = new();
     private readonly Mock<IStreamingJobTemplateRepository> streamingJobTemplateRepositoryMock = new();
 
     public StreamingJobOperatorServiceTests(LoggerFixture loggerFixture)
     {
         this.loggerFixture = loggerFixture;
-        this.materializer = this.actorSystem.Materializer();
+        materializer = actorSystem.Materializer();
 
-        this.streamClassRepositoryMock
+        streamClassRepositoryMock
             .Setup(m => m.Get(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(StreamClass.AsOption());
 
-        this.streamingJobTemplateRepositoryMock
+        streamingJobTemplateRepositoryMock
             .Setup(s => s.GetStreamingJobTemplate(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(StreamingJobTemplate.AsOption<IStreamingJobTemplate>());
     }
@@ -76,25 +76,26 @@ public class StreamingJobOperatorServiceTests : IClassFixture<LoggerFixture>
         // Arrange
         var mockSource = Source.From(new List<(WatchEventType, V1Job)>
         {
-            (WatchEventType.Deleted, job)
+            (WatchEventType.Deleted, job),
         });
-        this.kubeClusterMock.Setup(cluster =>
+        kubeClusterMock.Setup(cluster =>
                 cluster.StreamJobEvents(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<OverflowStrategy>(),
                     It.IsAny<TimeSpan?>()))
             .Returns(mockSource);
 
-        this.streamDefinitionRepositoryMock
+        streamDefinitionRepositoryMock
             .Setup(service => service.Get(job.Name(), job.ToOwnerApiRequest()))
             .ReturnsAsync(() => definitionExists ? StreamDefinition.AsOption() : Option<IStreamDefinition>.None);
-        var service = this.CreateService();
+        var service = CreateService();
 
         // Act
-        await service.GetJobEventsGraph(CancellationToken.None).Run(this.materializer);
+        await service.GetJobEventsGraph(CancellationToken.None).Run(materializer);
 
         // Assert
-        this.kubeClusterMock.Verify(s =>
-            s.SendJob(It.Is<V1Job>(j => isBackfilling ? j.IsBackfilling() : !j.IsBackfilling()), It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(definitionExists && expectRestart ? 1 : 0)
+        kubeClusterMock.Verify(expression: s =>
+                s.SendJob(It.Is<V1Job>(j => isBackfilling ? j.IsBackfilling() : !j.IsBackfilling()), It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()),
+            times: Times.Exactly(definitionExists && expectRestart ? 1 : 0)
         );
     }
 
@@ -105,25 +106,25 @@ public class StreamingJobOperatorServiceTests : IClassFixture<LoggerFixture>
         // Arrange
         var mockSource = Source.From(new List<(WatchEventType, V1Job)>
         {
-            (WatchEventType.Modified, job)
+            (WatchEventType.Modified, job),
         });
-        this.kubeClusterMock.Setup(cluster =>
+        kubeClusterMock.Setup(cluster =>
                 cluster.StreamJobEvents(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<OverflowStrategy>(),
                     It.IsAny<TimeSpan?>()))
             .Returns(mockSource);
 
-        var service = this.CreateService();
+        var service = CreateService();
 
         // Act
-        await service.GetJobEventsGraph(CancellationToken.None).Run(this.materializer);
+        await service.GetJobEventsGraph(CancellationToken.None).Run(materializer);
 
-        this.kubeClusterMock
-            .Verify(s => s.DeleteJob(
+        kubeClusterMock
+            .Verify(expression: s => s.DeleteJob(
                     It.IsAny<string>(),
                     It.IsAny<string>(),
                     It.IsAny<CancellationToken>(),
                     It.IsAny<PropagationPolicy>()),
-                Times.Exactly(expectToStopJob ? 1 : 0)
+                times: Times.Exactly(expectToStopJob ? 1 : 0)
             );
     }
 
@@ -134,27 +135,28 @@ public class StreamingJobOperatorServiceTests : IClassFixture<LoggerFixture>
         // Arrange
         var mockSource = Source.From(new List<(WatchEventType, V1Job)>
         {
-            (WatchEventType.Deleted, job)
+            (WatchEventType.Deleted, job),
         });
-        this.kubeClusterMock
-                    .Setup(cluster =>
-                        cluster.StreamJobEvents(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<OverflowStrategy>(),
-                            It.IsAny<TimeSpan?>()))
-                    .Returns(mockSource);
+        kubeClusterMock
+            .Setup(cluster =>
+                cluster.StreamJobEvents(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<OverflowStrategy>(),
+                    It.IsAny<TimeSpan?>()))
+            .Returns(mockSource);
 
-        this.streamDefinitionRepositoryMock
+        streamDefinitionRepositoryMock
             .Setup(service => service.Get(job.Name(), job.ToOwnerApiRequest()))
             .ReturnsAsync(streamDefinition.AsOption());
 
 
-        var service = this.CreateService();
+        var service = CreateService();
 
         // Act
-        await service.GetJobEventsGraph(CancellationToken.None).Run(this.materializer);
+        await service.GetJobEventsGraph(CancellationToken.None).Run(materializer);
 
-        this.kubeClusterMock.Verify(s =>
-            s.SendJob(It.Is<V1Job>(j => expectBackfill ? j.IsBackfilling() : !j.IsBackfilling()), It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(expectToRestart ? 1 : 0)
+        kubeClusterMock.Verify(expression: s =>
+                s.SendJob(It.Is<V1Job>(j => expectBackfill ? j.IsBackfilling() : !j.IsBackfilling()), It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()),
+            times: Times.Exactly(expectToRestart ? 1 : 0)
         );
     }
 
@@ -205,36 +207,36 @@ public class StreamingJobOperatorServiceTests : IClassFixture<LoggerFixture>
             MetricsPublisherActorConfiguration = new MetricsPublisherActorConfiguration
             {
                 InitialDelay = TimeSpan.FromSeconds(30),
-                UpdateInterval = TimeSpan.FromSeconds(10)
-            }
+                UpdateInterval = TimeSpan.FromSeconds(10),
+            },
         });
         return new ServiceCollection()
-            .AddSingleton(this.kubeClusterMock.Object)
-            .AddSingleton(this.streamDefinitionRepositoryMock.Object)
-            .AddSingleton(this.streamClassRepositoryMock.Object)
-            .AddSingleton(this.streamingJobTemplateRepositoryMock.Object)
+            .AddSingleton(kubeClusterMock.Object)
+            .AddSingleton(streamDefinitionRepositoryMock.Object)
+            .AddSingleton(streamClassRepositoryMock.Object)
+            .AddSingleton(streamingJobTemplateRepositoryMock.Object)
             .AddSingleton<ICommandHandler<UpdateStatusCommand>, UpdateStatusCommandHandler>()
             .AddSingleton<ICommandHandler<SetAnnotationCommand<IStreamDefinition>>, AnnotationCommandHandler>()
             .AddSingleton<ICommandHandler<StreamingJobCommand>, StreamingJobCommandHandler>()
             .AddSingleton<ICommandHandler<RemoveAnnotationCommand<IStreamDefinition>>, AnnotationCommandHandler>()
             .AddSingleton<IStreamingJobCollection, StreamingJobRepository>()
             .AddSingleton<IEventFilter<IStreamDefinition>, EmptyEventFilter<IStreamDefinition>>()
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<StreamingJobOperatorService>())
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<StreamingJobRepository>())
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<AnnotationCommandHandler>())
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<UpdateStatusCommandHandler>())
-            .AddSingleton(this.loggerFixture.Factory.CreateLogger<StreamingJobCommandHandler>())
+            .AddSingleton(loggerFixture.Factory.CreateLogger<StreamingJobOperatorService>())
+            .AddSingleton(loggerFixture.Factory.CreateLogger<StreamingJobRepository>())
+            .AddSingleton(loggerFixture.Factory.CreateLogger<AnnotationCommandHandler>())
+            .AddSingleton(loggerFixture.Factory.CreateLogger<UpdateStatusCommandHandler>())
+            .AddSingleton(loggerFixture.Factory.CreateLogger<StreamingJobCommandHandler>())
             .AddSingleton<IMetricsReporter, MetricsReporter>()
             .AddSingleton(Mock.Of<MetricsService>())
             .AddSingleton<StreamingJobOperatorService>()
             .AddSingleton(Options.Create(new StreamingJobOperatorServiceConfiguration
             {
-                MaxBufferCapacity = 1000
+                MaxBufferCapacity = 1000,
             }))
             .AddSingleton(metricsReporterConfiguration)
             .AddSingleton<HostedStreamingJobOperatorService>()
-            .AddSingleton(this.materializer)
-            .AddSingleton(this.actorSystem)
+            .AddSingleton(materializer)
+            .AddSingleton(actorSystem)
             .BuildServiceProvider()
             .GetRequiredService<StreamingJobOperatorService>();
     }

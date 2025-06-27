@@ -34,14 +34,14 @@ public class Startup(IConfiguration configuration)
 
     public void ConfigureServices(IServiceCollection services)
     {
-
         // Register the configuration
-        services.Configure<StreamingJobOperatorServiceConfiguration>(this.Configuration.GetSection(nameof(StreamingJobOperatorServiceConfiguration)));
+        services.Configure<StreamingJobOperatorServiceConfiguration>(Configuration.GetSection(nameof(StreamingJobOperatorServiceConfiguration)));
         services.Configure<MetricsReporterConfiguration>(
-            this.Configuration.GetSection(nameof(MetricsReporterConfiguration)));
+            Configuration.GetSection(nameof(MetricsReporterConfiguration)));
         services.Configure<StreamClassOperatorServiceConfiguration>(
-            this.Configuration.GetSection(nameof(StreamClassOperatorServiceConfiguration)));
-        services.Configure<StreamingJobTemplateRepositoryConfiguration>(this.Configuration.GetSection(nameof(StreamingJobTemplateRepositoryConfiguration)));
+            Configuration.GetSection(nameof(StreamClassOperatorServiceConfiguration)));
+        services.Configure<StreamingJobTemplateRepositoryConfiguration>(
+            Configuration.GetSection(nameof(StreamingJobTemplateRepositoryConfiguration)));
 
 
         // Register the custom resource repositories

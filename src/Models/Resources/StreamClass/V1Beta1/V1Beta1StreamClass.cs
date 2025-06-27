@@ -16,6 +16,12 @@ namespace Arcane.Operator.Models.Resources.StreamClass.V1Beta1;
 [ExcludeFromCodeCoverage(Justification = "Model")]
 public class V1Beta1StreamClass : IStreamClass
 {
+    /// <summary>
+    /// The StreamClass configuration
+    /// </summary>
+    [JsonPropertyName("spec")]
+    public V1Beta1StreamClassSpec Spec { get; set; }
+
     /// <inheritdoc cref="IMetadata{T}.Metadata"/>
     [JsonPropertyName("metadata")]
     public V1ObjectMeta Metadata { get; set; }
@@ -28,12 +34,6 @@ public class V1Beta1StreamClass : IStreamClass
     [JsonPropertyName("kind")]
     public string Kind { get; set; }
 
-    /// <summary>
-    /// The StreamClass configuration
-    /// </summary>
-    [JsonPropertyName("spec")]
-    public V1Beta1StreamClassSpec Spec { get; set; }
-
     /// <inheritdoc cref="IKubernetesObject.Kind"/>
     public string ToStreamClassId()
     {
@@ -41,32 +41,35 @@ public class V1Beta1StreamClass : IStreamClass
     }
 
     /// <inheritdoc cref="IStreamClass.ApiGroupRef"/>
-    public string ApiGroupRef => this.Spec.ApiGroupRef;
+    public string ApiGroupRef => Spec.ApiGroupRef;
 
     /// <inheritdoc cref="IStreamClass.VersionRef"/>
-    public string VersionRef => this.Spec.ApiVersion;
+    public string VersionRef => Spec.ApiVersion;
 
     /// <inheritdoc cref="IStreamClass.PluralNameRef"/>
-    public string PluralNameRef => this.Spec.PluralName;
+    public string PluralNameRef => Spec.PluralName;
 
     /// <inheritdoc cref="IStreamClass.KindRef"/>
-    public string KindRef => this.Spec.KindRef;
+    public string KindRef => Spec.KindRef;
 
     /// <inheritdoc cref="IStreamClass.MaxBufferCapacity"/>
-    public int MaxBufferCapacity => this.Spec.MaxBufferCapacity;
+    public int MaxBufferCapacity => Spec.MaxBufferCapacity;
 
     /// <inheritdoc cref="IStreamClass.IsSecretRef"/>
     public bool IsSecretRef(string propertyName)
     {
-        return this.Spec?.SecretRefs?.Contains(propertyName) ?? false;
+        return Spec?.SecretRefs?.Contains(propertyName) ?? false;
     }
 
     /// <inheritdoc cref="IStreamClass.ToNamespacedCrd"/>
     [ExcludeFromCodeCoverage(Justification = "Trivial")]
-    public NamespacedCrd ToNamespacedCrd() => new()
+    public NamespacedCrd ToNamespacedCrd()
     {
-        Group = this.ApiGroupRef,
-        Plural = this.PluralNameRef,
-        Version = this.VersionRef
-    };
+        return new NamespacedCrd
+        {
+            Group = ApiGroupRef,
+            Plural = PluralNameRef,
+            Version = VersionRef,
+        };
+    }
 }

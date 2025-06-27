@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using Arcane.Operator.Contracts;
+﻿using Arcane.Operator.Contracts;
 using Arcane.Operator.Models.Resources.StreamClass.Base;
 using k8s;
 using k8s.Models;
@@ -26,8 +25,8 @@ public interface IStreamDefinition : IKubernetesObject<V1ObjectMeta>
     [JsonIgnore]
     public bool CrashLoopDetected
         =>
-            this.Metadata?.Annotations != null
-            && this.Metadata.Annotations.TryGetValue(Annotations.STATE_ANNOTATION_KEY, out var value)
+            Metadata?.Annotations != null
+            && Metadata.Annotations.TryGetValue(key: Annotations.STATE_ANNOTATION_KEY, value: out var value)
             && value == Annotations.CRASH_LOOP_STATE_ANNOTATION_VALUE;
 
     /// <summary>

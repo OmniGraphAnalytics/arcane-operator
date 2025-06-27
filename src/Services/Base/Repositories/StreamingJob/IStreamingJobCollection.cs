@@ -1,5 +1,4 @@
-﻿using System.Threading.Tasks;
-using Akka;
+﻿using Akka;
 using Akka.Streams.Dsl;
 using Akka.Util;
 using Arcane.Operator.Models.Api;

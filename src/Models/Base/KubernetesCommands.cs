@@ -16,7 +16,8 @@ public abstract record KubernetesCommand;
 /// <param name="annotationKey">Annotation key</param>
 /// <param name="annotationValue">Annotation value</param>
 /// <typeparam name="TObject">Affected object type</typeparam>
-public abstract record SetAnnotationCommand<TObject>(TObject affectedResource,
+public abstract record SetAnnotationCommand<TObject>(
+    TObject affectedResource,
     string annotationKey,
     string annotationValue) : KubernetesCommand where TObject : IKubernetesObject<V1ObjectMeta>;
 
@@ -26,9 +27,9 @@ public abstract record SetAnnotationCommand<TObject>(TObject affectedResource,
 /// <param name="affectedResource">The resource to update</param>
 /// <param name="annotationKey">Annotation key</param>
 /// <typeparam name="TObject">Affected object type</typeparam>
-public abstract record RemoveAnnotationCommand<TObject>(TObject affectedResource,
+public abstract record RemoveAnnotationCommand<TObject>(
+    TObject affectedResource,
     string annotationKey) : KubernetesCommand where TObject : IKubernetesObject<V1ObjectMeta>;
-
 
 /// <summary>
 /// Update the stream definition status
@@ -36,7 +37,7 @@ public abstract record RemoveAnnotationCommand<TObject>(TObject affectedResource
 /// <param name="request"></param>
 /// <param name="conditions"></param>
 /// <param name="phase"></param>
-public abstract record SetResourceStatusCommand<TCondition, TPhase>(CustomResourceApiRequest request,
+public abstract record SetResourceStatusCommand<TCondition, TPhase>(
+    CustomResourceApiRequest request,
     TCondition[] conditions,
     TPhase phase) : KubernetesCommand;
-

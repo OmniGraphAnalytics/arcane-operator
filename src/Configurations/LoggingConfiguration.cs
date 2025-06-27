@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using Arcane.Operator.Services.Metrics;
 
 namespace Arcane.Operator.Configurations;

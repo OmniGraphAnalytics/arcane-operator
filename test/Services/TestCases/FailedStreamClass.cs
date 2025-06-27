@@ -19,38 +19,40 @@ public class FailedStreamClass : IStreamClass
 
     public string ApiVersion
     {
-        get => throw this.exception;
-        set => throw this.exception;
+        get => throw exception;
+        set => throw exception;
     }
 
     public string Kind
     {
-        get => throw this.exception;
-        set => throw this.exception;
+        get => throw exception;
+        set => throw exception;
     }
 
     public V1ObjectMeta Metadata
     {
-        get => throw this.exception;
-        set => throw this.exception;
-    }
-    public string ToStreamClassId()
-    {
-        throw this.exception;
+        get => throw exception;
+        set => throw exception;
     }
 
-    public string ApiGroupRef => throw this.exception;
-    public string VersionRef => throw this.exception;
-    public string PluralNameRef => throw this.exception;
-    public string KindRef => throw this.exception;
-    public int MaxBufferCapacity => throw this.exception;
+    public string ToStreamClassId()
+    {
+        throw exception;
+    }
+
+    public string ApiGroupRef => throw exception;
+    public string VersionRef => throw exception;
+    public string PluralNameRef => throw exception;
+    public string KindRef => throw exception;
+    public int MaxBufferCapacity => throw exception;
+
     public NamespacedCrd ToNamespacedCrd()
     {
-        throw this.exception;
+        throw exception;
     }
 
     public bool IsSecretRef(string propertyName)
     {
-        throw this.exception;
+        throw exception;
     }
 }

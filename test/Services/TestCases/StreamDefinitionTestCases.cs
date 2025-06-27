@@ -10,7 +10,9 @@ namespace Arcane.Operator.Tests.Services.TestCases;
 
 public static class StreamDefinitionTestCases
 {
-    private static readonly string StreamSpec = "{\"jobTemplateRef\": {\"name\": \"jobTemplate\"}, \"backfillJobTemplateRef\": {\"name\": \"jobTemplate\"}}";
+    private static readonly string StreamSpec =
+        "{\"jobTemplateRef\": {\"name\": \"jobTemplate\"}, \"backfillJobTemplateRef\": {\"name\": \"jobTemplate\"}}";
+
     public static readonly string Kind = "StreamDefinition";
     public static string ApiGroup = "streaming.sneaksanddata.com";
     public static string PluralName = "streams";
@@ -23,8 +25,8 @@ public static class StreamDefinitionTestCases
         Kind = Kind,
         Metadata = new V1ObjectMeta
         {
-            Name = "stream"
-        }
+            Name = "stream",
+        },
     };
 
     public static IStreamDefinition SuspendedStreamDefinition => new StreamDefinition
@@ -36,9 +38,9 @@ public static class StreamDefinitionTestCases
             Name = "stream",
             Annotations = new Dictionary<string, string>
             {
-                { Annotations.STATE_ANNOTATION_KEY, Annotations.SUSPENDED_STATE_ANNOTATION_VALUE }
-            }
-        }
+                { Annotations.STATE_ANNOTATION_KEY, Annotations.SUSPENDED_STATE_ANNOTATION_VALUE },
+            },
+        },
     };
 
     public static IStreamDefinition ReloadRequestedStreamDefinition => new StreamDefinition
@@ -50,9 +52,9 @@ public static class StreamDefinitionTestCases
             Name = "stream",
             Annotations = new Dictionary<string, string>
             {
-                { Annotations.STATE_ANNOTATION_KEY, Annotations.RELOADING_STATE_ANNOTATION_VALUE }
-            }
-        }
+                { Annotations.STATE_ANNOTATION_KEY, Annotations.RELOADING_STATE_ANNOTATION_VALUE },
+            },
+        },
     };
 
     public static FailedStreamDefinition FailedStreamDefinition(Exception exception)
@@ -60,14 +62,17 @@ public static class StreamDefinitionTestCases
         return new FailedStreamDefinition(exception);
     }
 
-    public static IStreamDefinition NamedStreamDefinition(string name = null) => new StreamDefinition
+    public static IStreamDefinition NamedStreamDefinition(string name = null)
     {
-        Spec = JsonDocument.Parse(StreamSpec).RootElement,
-        Kind = Kind,
-        Metadata = new V1ObjectMeta
+        return new StreamDefinition
         {
-            Name = name ?? Guid.NewGuid().ToString(),
-            NamespaceProperty = "namespace"
-        }
-    };
+            Spec = JsonDocument.Parse(StreamSpec).RootElement,
+            Kind = Kind,
+            Metadata = new V1ObjectMeta
+            {
+                Name = name ?? Guid.NewGuid().ToString(),
+                NamespaceProperty = "namespace",
+            },
+        };
+    }
 }

@@ -14,16 +14,20 @@ namespace Arcane.Operator.Services.Repositories.StreamingJob;
 
 public class StreamingJobRepository(IKubeCluster kubeCluster, ILogger<StreamingJobRepository> logger) : IStreamingJobCollection
 {
-    public Source<ResourceEvent<V1Job>, NotUsed> GetEvents(string nameSpace, int maxBufferCapacity) =>
-        kubeCluster
-            .StreamJobEvents(nameSpace, maxBufferCapacity, OverflowStrategy.Fail)
-            .Select(tuple => new ResourceEvent<V1Job>(tuple.Item1, tuple.Item2));
+    public Source<ResourceEvent<V1Job>, NotUsed> GetEvents(string nameSpace, int maxBufferCapacity)
+    {
+        return kubeCluster
+            .StreamJobEvents(jobNamespace: nameSpace, maxBufferCapacity: maxBufferCapacity, overflowStrategy: OverflowStrategy.Fail)
+            .Select(tuple => new ResourceEvent<V1Job>(EventType: tuple.Item1, kubernetesObject: tuple.Item2));
+    }
 
-    public Task<Option<V1Job>> Get(string nameSpace, string name) =>
-        kubeCluster.GetJob(name, nameSpace)
-            .TryMap(job => job?.AsOption() ?? Option<V1Job>.None, exception =>
+    public Task<Option<V1Job>> Get(string nameSpace, string name)
+    {
+        return kubeCluster.GetJob(jobId: name, jobNamespace: nameSpace)
+            .TryMap(selector: job => job?.AsOption() ?? Option<V1Job>.None, errorHandler: exception =>
             {
-                logger.LogWarning(exception, "The job resource {jobName} not found", name);
+                logger.LogWarning(exception: exception, message: "The job resource {jobName} not found", name);
                 return Option<V1Job>.None;
             });
+    }
 }

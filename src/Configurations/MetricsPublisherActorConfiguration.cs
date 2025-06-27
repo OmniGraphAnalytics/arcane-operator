@@ -1,6 +1,4 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
-using Arcane.Operator.Services.Metrics;
+﻿using System.Diagnostics.CodeAnalysis;
 using Arcane.Operator.Services.Metrics.Actors;
 
 namespace Arcane.Operator.Configurations;

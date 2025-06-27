@@ -15,13 +15,13 @@ public static class StreamClassTestCases
             KindRef = StreamDefinitionTestCases.Kind,
             ApiGroupRef = StreamDefinitionTestCases.ApiGroup,
             PluralName = StreamDefinitionTestCases.PluralName,
-            ApiVersion = StreamDefinitionTestCases.ApiVersion
+            ApiVersion = StreamDefinitionTestCases.ApiVersion,
         },
         Metadata = new V1ObjectMeta
         {
             Name = "StreamClass",
-            NamespaceProperty = "default"
-        }
+            NamespaceProperty = "default",
+        },
     };
 
     public static IStreamClass FailedStreamClass(Exception exception)
